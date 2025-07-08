@@ -1,0 +1,15 @@
+# Live Data Service Configuration Example
+# Rename this file to .env and fill in your actual values
+
+# Databento API Key (required for market data)
+DATABENTO_API_KEY=your_databento_api_key_here
+
+# Supabase Database Connection (required)
+host=your_supabase_host
+user=your_database_user
+password=your_database_password
+port=5432
+dbname=postgres
+
+# Alternative: Use full database URL instead of individual parts
+# DATABASE_URL=postgresql://user:password@host:5432/database

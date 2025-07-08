@@ -1,0 +1,31 @@
+# ===================================================================
+# LIVE DATA SERVICE CLOUD DEPENDENCIES (Minimal Package)
+# ===================================================================
+
+# Core Database Connection
+asyncpg>=0.28.0
+
+# Market Data API
+databento>=0.31.0
+
+# Environment Management
+python-dotenv>=1.0.0
+
+# Logging and Utilities
+colorama>=0.4.6
+
+# Data Processing (minimal)
+decimal  # Built-in Python module
+
+# Python standard library modules (no installation needed):
+# - asyncio
+# - logging
+# - datetime
+# - subprocess
+# - sys
+# - os
+# - time
+# - typing
+# - uuid
+# - json
+# - pathlib
