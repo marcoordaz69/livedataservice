@@ -15,7 +15,7 @@ python-dotenv>=1.0.0
 colorama>=0.4.6
 
 # Data Processing (minimal)
-decimal  # Built-in Python module
+# decimal  # Built-in Python module - no installation needed
 
 # Python standard library modules (no installation needed):
 # - asyncio

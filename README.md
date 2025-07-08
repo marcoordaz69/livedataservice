@@ -33,9 +33,14 @@ trading-data-service/
 
 ### Option 1: Railway (Recommended)
 1. Push this folder to a Git repository
-2. Connect Railway to your repository
+2. Connect Railway to your repository  
 3. Set environment variables (see below)
 4. Deploy as a worker service
+
+**Railway Configuration Files:**
+- `railway.json` - Railway deployment configuration
+- `Procfile` - Process type definition (worker service)
+- `requirements.txt` - Python dependencies (fixed for Railway compatibility)
 
 ### Option 2: Render
 1. Connect your repository to Render

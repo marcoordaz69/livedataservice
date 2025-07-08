@@ -1,0 +1,1 @@
+worker: python price_capture/live_data_launcher.py
