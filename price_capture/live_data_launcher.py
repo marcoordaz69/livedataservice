@@ -180,10 +180,12 @@ async def run_live_stream():
         env = os.environ.copy()
         
         # Set PYTHONPATH to ensure modules can be found
+        # Add both current directory and parent directory to Python path
+        parent_dir = os.path.dirname(os.getcwd())
         if "PYTHONPATH" in env:
-            env["PYTHONPATH"] = f"{os.getcwd()}:{env['PYTHONPATH']}"
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
         else:
-            env["PYTHONPATH"] = os.getcwd()
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
         
         # Set asyncio debug mode to help identify any remaining issues
         env["PYTHONASYNCIODEBUG"] = "1"
@@ -268,10 +270,12 @@ async def run_setup_monitor():
         
         # Set up the environment for the monitor process
         env = os.environ.copy()
+        # Add both current directory and parent directory to Python path
+        parent_dir = os.path.dirname(os.getcwd())
         if "PYTHONPATH" in env:
-            env["PYTHONPATH"] = f"{os.getcwd()}:{env['PYTHONPATH']}"
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
         else:
-            env["PYTHONPATH"] = os.getcwd()
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
             
         # Add event loop isolation settings
         env["PYTHONASYNCIODEBUG"] = "1"

@@ -466,6 +466,20 @@ class TradingDB:
             
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                # Get user_id from the setup record (since livedataservice has no user context)
+                setup_data = await conn.fetchrow("""
+                    SELECT user_id FROM trade_setups WHERE id = $1
+                """, setup_id)
+                
+                if not setup_data:
+                    self.logger.error(f"No setup found with ID {setup_id}")
+                    raise ValueError(f"No setup found with ID {setup_id}")
+                
+                user_id = setup_data['user_id']
+                if user_id:
+                    await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+                    self.logger.info(f"Set tenant context for user {user_id} in record_trade_entry (from setup)")
+                
                 # Create trade record with execution quality metrics
                 trade_id = await conn.fetchval("""
                     INSERT INTO trades (
@@ -473,12 +487,13 @@ class TradingDB:
                         entry_price,
                         entry_time,
                         quoted_entry_price,
-                        slippage_ticks
+                        slippage_ticks,
+                        user_id
                     )
-                    VALUES ($1, $2, $3, $4, $5)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     RETURNING id
                 """, setup_id, format_price(entry_price), entry_time, 
-                    quoted_entry_price, slippage_ticks)
+                    quoted_entry_price, slippage_ticks, user_id)
                 
                 # Update setup status
                 await conn.execute("""
@@ -551,10 +566,10 @@ class TradingDB:
         
         async with self.pool.acquire() as conn:
             async with conn.transaction():
-                # Get trade and setup details
+                # Get trade and setup details including user_id
                 trade_data = await conn.fetchrow("""
                     SELECT t.*, ts.take_profit, ts.stop_loss, ts.direction,
-                           ts.entry_zone_low, ts.entry_zone_high, t.entry_time
+                           ts.entry_zone_low, ts.entry_zone_high, t.entry_time, ts.user_id
                     FROM trades t
                     JOIN trade_setups ts ON t.setup_id = ts.id
                     WHERE t.id = $1
@@ -563,6 +578,12 @@ class TradingDB:
                 if not trade_data:
                     self.logger.error(f"No trade found with ID {trade_id}")
                     return
+                
+                # Get user_id from setup record (since livedataservice has no user context)
+                user_id = trade_data['user_id']
+                if user_id:
+                    await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+                    self.logger.info(f"Set tenant context for user {user_id} in record_trade_exit (from setup)")
                 
                 # Convert all numeric values to Decimal for consistent calculation
                 entry_price = Decimal(str(trade_data['entry_price']))
@@ -1058,15 +1079,21 @@ class TradingDB:
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 try:
-                    # Get setup details for validation
+                    # Get setup details for validation and user_id
                     setup = await conn.fetchrow("""
-                        SELECT status, take_profit, stop_loss
+                        SELECT status, take_profit, stop_loss, user_id
                         FROM trade_setups
                         WHERE id = $1
                     """, setup_id)
                     
                     if not setup:
                         raise ValueError(f"No setup found with ID {setup_id}")
+                    
+                    # Get user_id from setup record (since livedataservice has no user context)
+                    user_id = setup['user_id']
+                    if user_id:
+                        await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+                        self.logger.info(f"Set tenant context for user {user_id} in record_trade_from_setup (from setup)")
                     
                     if setup['status'] != 'open':
                         raise ValueError(f"Setup {setup_id} is not open (status: {setup['status']})")
@@ -1096,16 +1123,19 @@ class TradingDB:
                             entry_price,
                             entry_time,
                             created_at,
-                            updated_at
+                            updated_at,
+                            user_id
                         ) VALUES (
                             $1, $2, $3,
                             CURRENT_TIMESTAMP,
-                            CURRENT_TIMESTAMP
+                            CURRENT_TIMESTAMP,
+                            $4
                         ) RETURNING id
                     """,
                         setup_id,
                         formatted_price,
-                        get_utc_now()
+                        get_utc_now(),
+                        user_id
                     )
                     
                     # Format prices for logging
@@ -2049,3 +2079,61 @@ class TradingDB:
             self.logger.error(f"Error in trade outcome audit: {e}", exc_info=True)
             
         return results
+
+    async def get_trade_setups_by_user(self, user_id: str, limit: int = 50) -> List[Dict]:
+        """Get trade setups for a specific user with proper tenant context
+        
+        Args:
+            user_id: User ID to get trade setups for
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of trade setup dictionaries
+        """
+        await self.ensure_connected()
+        
+        try:
+            # Convert string to UUID if needed
+            user_uuid = user_id if isinstance(user_id, str) else str(user_id)
+            
+            async with self.pool.acquire() as conn:
+                # Set tenant context for this query
+                await conn.execute(f"SELECT set_config('app.current_user', '{user_uuid}', TRUE)")
+                
+                # Query trade setups for the user
+                rows = await conn.fetch("""
+                    SELECT 
+                        id,
+                        symbol,
+                        status,
+                        entry_zone_low,
+                        entry_zone_high,
+                        take_profit,
+                        stop_loss,
+                        direction,
+                        setup_time,
+                        created_at,
+                        updated_at,
+                        characteristics,
+                        user_id
+                    FROM trade_setups
+                    WHERE user_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2
+                """, user_uuid, limit)
+                
+                # Convert to dictionaries
+                setups = []
+                for row in rows:
+                    setup = dict(row)
+                    # Convert UUID to string for JSON serialization
+                    setup['id'] = str(setup['id'])
+                    setup['user_id'] = str(setup['user_id'])
+                    setups.append(setup)
+                
+                self.logger.info(f"Retrieved {len(setups)} trade setups for user: {user_id}")
+                return setups
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get trade setups for user {user_id}: {str(e)}")
+            raise

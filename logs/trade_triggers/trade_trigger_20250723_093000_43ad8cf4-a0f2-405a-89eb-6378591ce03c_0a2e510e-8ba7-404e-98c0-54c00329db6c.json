@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-07-23T09:30:00.540768+00:00",
+  "setup_id": "43ad8cf4-a0f2-405a-89eb-6378591ce03c",
+  "trade_id": "0a2e510e-8ba7-404e-98c0-54c00329db6c",
+  "symbol": "NQ.FUT",
+  "trigger_type": "range_overlap",
+  "entry_price": 23262.0,
+  "close_price": 23261.0,
+  "high_price": 23263.75,
+  "low_price": 23260.25,
+  "entry_zone_low": 23258.0,
+  "entry_zone_high": 23262.0,
+  "take_profit": 23230.0,
+  "stop_loss": 23272.0,
+  "direction": "short",
+  "price_range_overlap": true,
+  "in_entry_zone": null,
+  "setup_data": {
+    "symbol": "NQ.FUT",
+    "status": "active",
+    "setup_time": 

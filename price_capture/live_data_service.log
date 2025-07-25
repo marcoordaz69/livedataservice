@@ -1,0 +1,440 @@
+2025-07-17 10:36:01,573 - INFO - === STARTING LIVE DATA SERVICE ===
+2025-07-17 10:36:01,574 - INFO - Checking database status before starting...
+2025-07-17 10:36:01,933 - INFO - === DATABASE STATUS ===
+2025-07-17 10:36:01,933 - INFO - Total NQ records: 227288
+2025-07-17 10:36:01,933 - INFO - Time range: 2024-03-31 22:00:00+00:00 to 2025-07-17 17:29:00+00:00 (UTC)
+2025-07-17 10:36:01,991 - INFO - Most recent records:
+2025-07-17 10:36:01,991 - INFO -   RECORD 1/5:
+2025-07-17 10:36:01,991 - INFO -     Timestamp: 2025-07-17 17:29:00
+2025-07-17 10:36:01,991 - INFO -     OHLC: $23254.50/$23259.00/$23254.00/$23258.00
+2025-07-17 10:36:01,991 - INFO -     Volume: 564
+2025-07-17 10:36:01,991 - INFO -     Contract: NQ.n.0
+2025-07-17 10:36:01,992 - INFO -   RECORD 2/5:
+2025-07-17 10:36:01,992 - INFO -     Timestamp: 2025-07-17 17:28:00
+2025-07-17 10:36:01,992 - INFO -     OHLC: $23248.50/$23255.50/$23240.50/$23254.50
+2025-07-17 10:36:01,992 - INFO -     Volume: 1035
+2025-07-17 10:36:01,992 - INFO -     Contract: NQ.n.0
+2025-07-17 10:36:01,992 - INFO -   RECORD 3/5:
+2025-07-17 10:36:01,992 - INFO -     Timestamp: 2025-07-17 17:27:00
+2025-07-17 10:36:01,992 - INFO -     OHLC: $23253.75/$23256.00/$23245.25/$23248.75
+2025-07-17 10:36:01,992 - INFO -     Volume: 1339
+2025-07-17 10:36:01,992 - INFO -     Contract: NQ.n.0
+2025-07-17 10:36:01,992 - INFO -   RECORD 4/5:
+2025-07-17 10:36:01,992 - INFO -     Timestamp: 2025-07-17 17:26:00
+2025-07-17 10:36:01,992 - INFO -     OHLC: $23256.25/$23257.25/$23253.75/$23254.50
+2025-07-17 10:36:01,992 - INFO -     Volume: 424
+2025-07-17 10:36:01,992 - INFO -     Contract: NQ.n.0
+2025-07-17 10:36:01,992 - INFO -   RECORD 5/5:
+2025-07-17 10:36:01,992 - INFO -     Timestamp: 2025-07-17 17:25:00
+2025-07-17 10:36:01,992 - INFO -     OHLC: $23256.50/$23258.75/$23255.00/$23256.50
+2025-07-17 10:36:01,992 - INFO -     Volume: 294
+2025-07-17 10:36:01,992 - INFO -     Contract: NQ.n.0
+2025-07-17 10:36:02,022 - INFO - Starting historical data load (lookback period: 4 days)...
+2025-07-17 10:36:02,022 - INFO - === INITIALIZING HISTORICAL DATA LOAD ===
+2025-07-17 10:36:02,022 - INFO - Initialized Historical(gateway=https://hist.databento.com)
+2025-07-17 10:36:02,022 - INFO - Using provided start time: 2025-07-17T17:30:00+00:00 (UTC)
+2025-07-17 10:36:02,022 - INFO - ===== STAGE 2: LIVE API (from 2025-07-17T17:30:00+00:00 to now) =====
+2025-07-17 10:36:02,022 - INFO - Subscribing to NQ.n.0 OHLCV data starting from 2025-07-17T17:30:00+00:00 (UTC)...
+2025-07-17 10:36:02,023 - INFO - subscribing to ohlcv-1m:continuous ['NQ.n.0'] start=1752773400000000000 snapshot=False
+2025-07-17 10:36:02,023 - INFO - connecting to remote gateway
+2025-07-17 10:36:02,280 - INFO - authenticated session 1753882295
+2025-07-17 10:36:02,280 - INFO - sending subscription to ohlcv-1m:continuous ['NQ.n.0'] start=1752773400000000000 snapshot=False
+2025-07-17 10:36:02,281 - INFO - Starting to collect recent historical data...
+2025-07-17 10:36:02,281 - INFO - starting live client
+2025-07-17 10:36:02,508 - INFO - gateway message: Subscription request 1 for ohlcv-1m data succeeded
+2025-07-17 10:36:02,508 - INFO - added symbology mapping NQU5 to 42008487
+2025-07-17 10:36:02,508 - INFO - Symbol mapping: Unknown -> 42008487
+2025-07-17 10:36:02,517 - INFO - Setting primary contract to 42008487 with avg volume 538.0
+2025-07-17 10:36:02,556 - INFO - gateway message: Finished ohlcv-1m replay
+2025-07-17 10:39:30,983 - INFO - Reached collection time limit, stopping historical data collection
+2025-07-17 10:39:30,983 - INFO - terminating live client
+2025-07-17 10:39:30,984 - INFO - Collected 9 unique minute bars in total
+2025-07-17 10:39:30,984 - INFO - Primary contract identified: 42008487 with avg volume 392.4
+2025-07-17 10:39:30,984 - INFO - Contract 42008487: 9 records (100.0%)
+2025-07-17 10:39:30,984 - INFO - terminating live client
+2025-07-17 10:39:30,984 - INFO - === INSERTING 9 RECORDS INTO DATABASE ===
+2025-07-17 10:39:30,984 - INFO - Sample of data being inserted (showing 3 records):
+2025-07-17 10:39:30,984 - INFO -   RECORD 1/3:
+2025-07-17 10:39:30,984 - INFO -     Symbol:        NQ
+2025-07-17 10:39:30,984 - INFO -     Timestamp:     2025-07-17T17:30:00+00:00 (UTC)
+2025-07-17 10:39:30,984 - INFO -     Open:          $23258.25
+2025-07-17 10:39:30,984 - INFO -     High:          $23261.50
+2025-07-17 10:39:30,984 - INFO -     Low:           $23255.75
+2025-07-17 10:39:30,984 - INFO -     Close:         $23257.50
+2025-07-17 10:39:30,984 - INFO -     Volume:        668
+2025-07-17 10:39:30,984 - INFO -     Source:        NQ.n.0
+2025-07-17 10:39:30,984 - INFO -   RECORD 2/3:
+2025-07-17 10:39:30,984 - INFO -     Symbol:        NQ
+2025-07-17 10:39:30,984 - INFO -     Timestamp:     2025-07-17T17:31:00+00:00 (UTC)
+2025-07-17 10:39:30,984 - INFO -     Open:          $23257.75
+2025-07-17 10:39:30,984 - INFO -     High:          $23261.25
+2025-07-17 10:39:30,984 - INFO -     Low:           $23255.50
+2025-07-17 10:39:30,984 - INFO -     Close:         $23260.00
+2025-07-17 10:39:30,984 - INFO -     Volume:        353
+2025-07-17 10:39:30,984 - INFO -     Source:        NQ.n.0
+2025-07-17 10:39:30,984 - INFO -   RECORD 3/3:
+2025-07-17 10:39:30,984 - INFO -     Symbol:        NQ
+2025-07-17 10:39:30,985 - INFO -     Timestamp:     2025-07-17T17:32:00+00:00 (UTC)
+2025-07-17 10:39:30,985 - INFO -     Open:          $23260.25
+2025-07-17 10:39:30,985 - INFO -     High:          $23262.00
+2025-07-17 10:39:30,985 - INFO -     Low:           $23253.75
+2025-07-17 10:39:30,985 - INFO -     Close:         $23255.25
+2025-07-17 10:39:30,985 - INFO -     Volume:        593
+2025-07-17 10:39:30,985 - INFO -     Source:        NQ.n.0
+2025-07-17 10:39:36,595 - INFO - Inserted batch 1/1 (9 records)
+2025-07-17 10:39:36,595 - INFO - Successfully inserted 9 records into database
+2025-07-17 10:39:36,624 - INFO - Inserted 9 historical records
+2025-07-17 10:39:36,624 - INFO - Historical backfill completed
+2025-07-17 10:39:36,626 - INFO - Shutdown signal received, stopping live data service...
+2025-07-17 10:46:43,793 - INFO - === STARTING LIVE DATA SERVICE ===
+2025-07-17 10:46:43,794 - INFO - Checking database status before starting...
+2025-07-17 10:46:44,126 - INFO - === DATABASE STATUS ===
+2025-07-17 10:46:44,126 - INFO - Total NQ records: 227297
+2025-07-17 10:46:44,126 - INFO - Time range: 2024-03-31 22:00:00+00:00 to 2025-07-17 17:38:00+00:00 (UTC)
+2025-07-17 10:46:44,178 - INFO - Most recent records:
+2025-07-17 10:46:44,178 - INFO -   RECORD 1/5:
+2025-07-17 10:46:44,178 - INFO -     Timestamp: 2025-07-17 17:38:00
+2025-07-17 10:46:44,178 - INFO -     OHLC: $23257.50/$23262.75/$23257.25/$23260.50
+2025-07-17 10:46:44,179 - INFO -     Volume: 518
+2025-07-17 10:46:44,179 - INFO -     Contract: NQ.n.0
+2025-07-17 10:46:44,179 - INFO -   RECORD 2/5:
+2025-07-17 10:46:44,179 - INFO -     Timestamp: 2025-07-17 17:37:00
+2025-07-17 10:46:44,179 - INFO -     OHLC: $23258.00/$23259.50/$23256.50/$23258.00
+2025-07-17 10:46:44,179 - INFO -     Volume: 193
+2025-07-17 10:46:44,179 - INFO -     Contract: NQ.n.0
+2025-07-17 10:46:44,179 - INFO -   RECORD 3/5:
+2025-07-17 10:46:44,179 - INFO -     Timestamp: 2025-07-17 17:36:00
+2025-07-17 10:46:44,179 - INFO -     OHLC: $23256.25/$23259.75/$23255.25/$23257.75
+2025-07-17 10:46:44,179 - INFO -     Volume: 292
+2025-07-17 10:46:44,179 - INFO -     Contract: NQ.n.0
+2025-07-17 10:46:44,179 - INFO -   RECORD 4/5:
+2025-07-17 10:46:44,179 - INFO -     Timestamp: 2025-07-17 17:35:00
+2025-07-17 10:46:44,179 - INFO -     OHLC: $23257.75/$23259.75/$23255.25/$23256.50
+2025-07-17 10:46:44,179 - INFO -     Volume: 308
+2025-07-17 10:46:44,179 - INFO -     Contract: NQ.n.0
+2025-07-17 10:46:44,179 - INFO -   RECORD 5/5:
+2025-07-17 10:46:44,179 - INFO -     Timestamp: 2025-07-17 17:34:00
+2025-07-17 10:46:44,180 - INFO -     OHLC: $23255.25/$23259.00/$23254.50/$23257.50
+2025-07-17 10:46:44,180 - INFO -     Volume: 277
+2025-07-17 10:46:44,180 - INFO -     Contract: NQ.n.0
+2025-07-17 10:46:44,205 - INFO - Starting historical data load (lookback period: 4 days)...
+2025-07-17 10:46:44,205 - INFO - === INITIALIZING HISTORICAL DATA LOAD ===
+2025-07-17 10:46:44,205 - INFO - Initialized Historical(gateway=https://hist.databento.com)
+2025-07-17 10:46:44,205 - INFO - Using provided start time: 2025-07-17T17:39:00+00:00 (UTC)
+2025-07-17 10:46:44,205 - INFO - ===== STAGE 2: LIVE API (from 2025-07-17T17:39:00+00:00 to now) =====
+2025-07-17 10:46:44,205 - INFO - Subscribing to NQ.n.0 OHLCV data starting from 2025-07-17T17:39:00+00:00 (UTC)...
+2025-07-17 10:46:44,205 - INFO - subscribing to ohlcv-1m:continuous ['NQ.n.0'] start=1752773940000000000 snapshot=False
+2025-07-17 10:46:44,206 - INFO - connecting to remote gateway
+2025-07-17 10:46:44,469 - INFO - authenticated session 1753857862
+2025-07-17 10:46:44,469 - INFO - sending subscription to ohlcv-1m:continuous ['NQ.n.0'] start=1752773940000000000 snapshot=False
+2025-07-17 10:46:44,470 - INFO - Starting to collect recent historical data...
+2025-07-17 10:46:44,470 - INFO - starting live client
+2025-07-17 10:46:44,753 - INFO - gateway message: Subscription request 1 for ohlcv-1m data succeeded
+2025-07-17 10:46:44,753 - INFO - added symbology mapping NQU5 to 42008487
+2025-07-17 10:46:44,753 - INFO - gateway message: Finished ohlcv-1m replay
+2025-07-17 10:46:44,753 - INFO - Symbol mapping: Unknown -> 42008487
+2025-07-17 10:46:44,754 - INFO - Setting primary contract to 42008487 with avg volume 326.3
+2025-07-17 10:50:00,075 - INFO - Reached collection time limit, stopping historical data collection
+2025-07-17 10:50:00,075 - INFO - terminating live client
+2025-07-17 10:50:00,075 - INFO - Collected 10 unique minute bars in total
+2025-07-17 10:50:00,075 - INFO - Primary contract identified: 42008487 with avg volume 383.5
+2025-07-17 10:50:00,075 - INFO - Contract 42008487: 10 records (100.0%)
+2025-07-17 10:50:00,075 - INFO - terminating live client
+2025-07-17 10:50:00,075 - INFO - === INSERTING 10 RECORDS INTO DATABASE ===
+2025-07-17 10:50:00,075 - INFO - Sample of data being inserted (showing 3 records):
+2025-07-17 10:50:00,076 - INFO -   RECORD 1/3:
+2025-07-17 10:50:00,076 - INFO -     Symbol:        NQ
+2025-07-17 10:50:00,076 - INFO -     Timestamp:     2025-07-17T17:39:00+00:00 (UTC)
+2025-07-17 10:50:00,076 - INFO -     Open:          $23260.50
+2025-07-17 10:50:00,076 - INFO -     High:          $23261.00
+2025-07-17 10:50:00,076 - INFO -     Low:           $23258.75
+2025-07-17 10:50:00,076 - INFO -     Close:         $23258.75
+2025-07-17 10:50:00,076 - INFO -     Volume:        193
+2025-07-17 10:50:00,076 - INFO -     Source:        NQ.n.0
+2025-07-17 10:50:00,076 - INFO -   RECORD 2/3:
+2025-07-17 10:50:00,076 - INFO -     Symbol:        NQ
+2025-07-17 10:50:00,076 - INFO -     Timestamp:     2025-07-17T17:40:00+00:00 (UTC)
+2025-07-17 10:50:00,076 - INFO -     Open:          $23258.75
+2025-07-17 10:50:00,076 - INFO -     High:          $23263.25
+2025-07-17 10:50:00,076 - INFO -     Low:           $23258.25
+2025-07-17 10:50:00,076 - INFO -     Close:         $23260.00
+2025-07-17 10:50:00,076 - INFO -     Volume:        456
+2025-07-17 10:50:00,076 - INFO -     Source:        NQ.n.0
+2025-07-17 10:50:00,076 - INFO -   RECORD 3/3:
+2025-07-17 10:50:00,076 - INFO -     Symbol:        NQ
+2025-07-17 10:50:00,076 - INFO -     Timestamp:     2025-07-17T17:41:00+00:00 (UTC)
+2025-07-17 10:50:00,076 - INFO -     Open:          $23260.25
+2025-07-17 10:50:00,076 - INFO -     High:          $23262.50
+2025-07-17 10:50:00,076 - INFO -     Low:           $23260.25
+2025-07-17 10:50:00,076 - INFO -     Close:         $23261.75
+2025-07-17 10:50:00,076 - INFO -     Volume:        330
+2025-07-17 10:50:00,076 - INFO -     Source:        NQ.n.0
+2025-07-17 10:50:00,622 - INFO - Inserted batch 1/1 (10 records)
+2025-07-17 10:50:00,622 - INFO - Successfully inserted 10 records into database
+2025-07-17 10:50:00,649 - INFO - Inserted 10 historical records
+2025-07-17 10:50:00,650 - INFO - Historical backfill completed
+2025-07-17 10:50:00,651 - INFO - Shutdown signal received, stopping live data service...
+2025-07-17 11:15:25,323 - INFO - === STARTING LIVE DATA SERVICE ===
+2025-07-17 11:15:25,325 - INFO - Checking database status before starting...
+2025-07-17 11:15:26,543 - INFO - === DATABASE STATUS ===
+2025-07-17 11:15:26,543 - INFO - Total NQ records: 227333
+2025-07-17 11:15:26,543 - INFO - Time range: 2024-03-31 22:00:00+00:00 to 2025-07-17 18:14:00+00:00 (UTC)
+2025-07-17 11:15:26,758 - INFO - Most recent records:
+2025-07-17 11:15:26,758 - INFO -   RECORD 1/5:
+2025-07-17 11:15:26,758 - INFO -     Timestamp: 2025-07-17 18:14:00
+2025-07-17 11:15:26,758 - INFO -     OHLC: $23243.25/$23243.50/$23241.00/$23242.00
+2025-07-17 11:15:26,758 - INFO -     Volume: 392
+2025-07-17 11:15:26,758 - INFO -     Contract: NQ.n.0
+2025-07-17 11:15:26,758 - INFO -   RECORD 2/5:
+2025-07-17 11:15:26,758 - INFO -     Timestamp: 2025-07-17 18:13:00
+2025-07-17 11:15:26,758 - INFO -     OHLC: $23242.00/$23245.50/$23241.50/$23243.50
+2025-07-17 11:15:26,758 - INFO -     Volume: 599
+2025-07-17 11:15:26,758 - INFO -     Contract: NQ.n.0
+2025-07-17 11:15:26,758 - INFO -   RECORD 3/5:
+2025-07-17 11:15:26,758 - INFO -     Timestamp: 2025-07-17 18:12:00
+2025-07-17 11:15:26,758 - INFO -     OHLC: $23244.50/$23246.25/$23241.25/$23242.00
+2025-07-17 11:15:26,758 - INFO -     Volume: 602
+2025-07-17 11:15:26,758 - INFO -     Contract: NQ.n.0
+2025-07-17 11:15:26,758 - INFO -   RECORD 4/5:
+2025-07-17 11:15:26,758 - INFO -     Timestamp: 2025-07-17 18:11:00
+2025-07-17 11:15:26,758 - INFO -     OHLC: $23249.25/$23249.50/$23242.50/$23244.75
+2025-07-17 11:15:26,758 - INFO -     Volume: 889
+2025-07-17 11:15:26,758 - INFO -     Contract: NQ.n.0
+2025-07-17 11:15:26,758 - INFO -   RECORD 5/5:
+2025-07-17 11:15:26,758 - INFO -     Timestamp: 2025-07-17 18:10:00
+2025-07-17 11:15:26,758 - INFO -     OHLC: $23251.25/$23253.50/$23248.50/$23249.00
+2025-07-17 11:15:26,758 - INFO -     Volume: 626
+2025-07-17 11:15:26,758 - INFO -     Contract: NQ.n.0
+2025-07-17 11:15:26,788 - INFO - Starting historical data load (lookback period: 4 days)...
+2025-07-17 11:15:26,789 - INFO - === INITIALIZING HISTORICAL DATA LOAD ===
+2025-07-17 11:15:26,791 - INFO - Initialized Historical(gateway=https://hist.databento.com)
+2025-07-17 11:15:26,791 - INFO - Using provided start time: 2025-07-17T18:15:00+00:00 (UTC)
+2025-07-17 11:15:26,791 - INFO - ===== STAGE 2: LIVE API (from 2025-07-17T18:15:00+00:00 to now) =====
+2025-07-17 11:15:26,791 - INFO - Subscribing to NQ.n.0 OHLCV data starting from 2025-07-17T18:15:00+00:00 (UTC)...
+2025-07-17 11:15:26,791 - INFO - subscribing to ohlcv-1m:continuous ['NQ.n.0'] start=1752776100000000000 snapshot=False
+2025-07-17 11:15:26,792 - INFO - connecting to remote gateway
+2025-07-17 11:15:27,306 - INFO - authenticated session 1753865700
+2025-07-17 11:15:27,306 - INFO - sending subscription to ohlcv-1m:continuous ['NQ.n.0'] start=1752776100000000000 snapshot=False
+2025-07-17 11:15:27,307 - INFO - Starting to collect recent historical data...
+2025-07-17 11:15:27,307 - INFO - starting live client
+2025-07-17 11:15:27,570 - INFO - gateway message: Subscription request 1 for ohlcv-1m data succeeded
+2025-07-17 11:15:27,570 - INFO - added symbology mapping NQU5 to 42008487
+2025-07-17 11:15:27,570 - INFO - Symbol mapping: Unknown -> 42008487
+2025-07-17 11:15:27,576 - INFO - gateway message: Finished ohlcv-1m replay
+2025-07-17 11:18:00,088 - INFO - Setting primary contract to 42008487 with avg volume 969.7
+2025-07-17 11:18:30,090 - INFO - Reached collection time limit, stopping historical data collection
+2025-07-17 11:18:30,090 - INFO - terminating live client
+2025-07-17 11:18:30,091 - INFO - Collected 3 unique minute bars in total
+2025-07-17 11:18:30,091 - INFO - Primary contract identified: 42008487 with avg volume 969.7
+2025-07-17 11:18:30,091 - INFO - Contract 42008487: 3 records (100.0%)
+2025-07-17 11:18:30,091 - INFO - terminating live client
+2025-07-17 11:18:30,091 - INFO - === INSERTING 3 RECORDS INTO DATABASE ===
+2025-07-17 11:18:30,091 - INFO - Sample of data being inserted (showing 3 records):
+2025-07-17 11:18:30,091 - INFO -   RECORD 1/3:
+2025-07-17 11:18:30,091 - INFO -     Symbol:        NQ
+2025-07-17 11:18:30,091 - INFO -     Timestamp:     2025-07-17T18:15:00+00:00 (UTC)
+2025-07-17 11:18:30,091 - INFO -     Open:          $23242.00
+2025-07-17 11:18:30,091 - INFO -     High:          $23243.00
+2025-07-17 11:18:30,091 - INFO -     Low:           $23236.50
+2025-07-17 11:18:30,091 - INFO -     Close:         $23241.75
+2025-07-17 11:18:30,091 - INFO -     Volume:        1209
+2025-07-17 11:18:30,091 - INFO -     Source:        NQ.n.0
+2025-07-17 11:18:30,091 - INFO -   RECORD 2/3:
+2025-07-17 11:18:30,091 - INFO -     Symbol:        NQ
+2025-07-17 11:18:30,091 - INFO -     Timestamp:     2025-07-17T18:16:00+00:00 (UTC)
+2025-07-17 11:18:30,091 - INFO -     Open:          $23242.00
+2025-07-17 11:18:30,091 - INFO -     High:          $23250.75
+2025-07-17 11:18:30,091 - INFO -     Low:           $23239.50
+2025-07-17 11:18:30,091 - INFO -     Close:         $23250.50
+2025-07-17 11:18:30,091 - INFO -     Volume:        1237
+2025-07-17 11:18:30,091 - INFO -     Source:        NQ.n.0
+2025-07-17 11:18:30,091 - INFO -   RECORD 3/3:
+2025-07-17 11:18:30,092 - INFO -     Symbol:        NQ
+2025-07-17 11:18:30,092 - INFO -     Timestamp:     2025-07-17T18:17:00+00:00 (UTC)
+2025-07-17 11:18:30,092 - INFO -     Open:          $23250.25
+2025-07-17 11:18:30,092 - INFO -     High:          $23251.50
+2025-07-17 11:18:30,092 - INFO -     Low:           $23245.50
+2025-07-17 11:18:30,092 - INFO -     Close:         $23246.50
+2025-07-17 11:18:30,092 - INFO -     Volume:        463
+2025-07-17 11:18:30,092 - INFO -     Source:        NQ.n.0
+2025-07-17 11:18:30,449 - INFO - Inserted batch 1/1 (3 records)
+2025-07-17 11:18:30,449 - INFO - Successfully inserted 3 records into database
+2025-07-17 11:18:30,479 - INFO - Inserted 3 historical records
+2025-07-17 11:18:30,480 - INFO - Historical backfill completed
+2025-07-17 11:18:30,480 - INFO - Shutdown signal received, stopping live data service...
+2025-07-17 11:59:55,103 - INFO - === STARTING LIVE DATA SERVICE ===
+2025-07-17 11:59:55,106 - INFO - Checking database status before starting...
+2025-07-17 11:59:56,387 - INFO - === DATABASE STATUS ===
+2025-07-17 11:59:56,387 - INFO - Total NQ records: 227342
+2025-07-17 11:59:56,387 - INFO - Time range: 2024-03-31 22:00:00+00:00 to 2025-07-17 18:23:00+00:00 (UTC)
+2025-07-17 11:59:56,445 - INFO - Most recent records:
+2025-07-17 11:59:56,445 - INFO -   RECORD 1/5:
+2025-07-17 11:59:56,445 - INFO -     Timestamp: 2025-07-17 18:23:00
+2025-07-17 11:59:56,445 - INFO -     OHLC: $23247.75/$23249.75/$23247.25/$23248.50
+2025-07-17 11:59:56,445 - INFO -     Volume: 335
+2025-07-17 11:59:56,445 - INFO -     Contract: NQ.n.0
+2025-07-17 11:59:56,445 - INFO -   RECORD 2/5:
+2025-07-17 11:59:56,445 - INFO -     Timestamp: 2025-07-17 18:22:00
+2025-07-17 11:59:56,446 - INFO -     OHLC: $23248.50/$23250.00/$23247.00/$23247.50
+2025-07-17 11:59:56,446 - INFO -     Volume: 427
+2025-07-17 11:59:56,446 - INFO -     Contract: NQ.n.0
+2025-07-17 11:59:56,446 - INFO -   RECORD 3/5:
+2025-07-17 11:59:56,446 - INFO -     Timestamp: 2025-07-17 18:21:00
+2025-07-17 11:59:56,446 - INFO -     OHLC: $23253.25/$23253.25/$23247.25/$23248.25
+2025-07-17 11:59:56,446 - INFO -     Volume: 550
+2025-07-17 11:59:56,446 - INFO -     Contract: NQ.n.0
+2025-07-17 11:59:56,446 - INFO -   RECORD 4/5:
+2025-07-17 11:59:56,446 - INFO -     Timestamp: 2025-07-17 18:20:00
+2025-07-17 11:59:56,446 - INFO -     OHLC: $23253.00/$23254.50/$23251.75/$23253.75
+2025-07-17 11:59:56,446 - INFO -     Volume: 511
+2025-07-17 11:59:56,446 - INFO -     Contract: NQ.n.0
+2025-07-17 11:59:56,446 - INFO -   RECORD 5/5:
+2025-07-17 11:59:56,446 - INFO -     Timestamp: 2025-07-17 18:19:00
+2025-07-17 11:59:56,446 - INFO -     OHLC: $23247.25/$23255.50/$23246.50/$23253.00
+2025-07-17 11:59:56,446 - INFO -     Volume: 966
+2025-07-17 11:59:56,446 - INFO -     Contract: NQ.n.0
+2025-07-17 11:59:56,475 - INFO - Starting historical data load (lookback period: 4 days)...
+2025-07-17 11:59:56,475 - INFO - === INITIALIZING HISTORICAL DATA LOAD ===
+2025-07-17 11:59:56,476 - INFO - Initialized Historical(gateway=https://hist.databento.com)
+2025-07-17 11:59:56,477 - INFO - Using provided start time: 2025-07-17T18:24:00+00:00 (UTC)
+2025-07-17 11:59:56,477 - INFO - ===== STAGE 2: LIVE API (from 2025-07-17T18:24:00+00:00 to now) =====
+2025-07-17 11:59:56,477 - INFO - Subscribing to NQ.n.0 OHLCV data starting from 2025-07-17T18:24:00+00:00 (UTC)...
+2025-07-17 11:59:56,477 - INFO - subscribing to ohlcv-1m:continuous ['NQ.n.0'] start=1752776640000000000 snapshot=False
+2025-07-17 11:59:56,477 - INFO - connecting to remote gateway
+2025-07-17 11:59:56,973 - INFO - authenticated session 1753877737
+2025-07-17 11:59:56,973 - INFO - sending subscription to ohlcv-1m:continuous ['NQ.n.0'] start=1752776640000000000 snapshot=False
+2025-07-17 11:59:56,974 - INFO - Starting to collect recent historical data...
+2025-07-17 11:59:56,974 - INFO - starting live client
+2025-07-17 11:59:57,215 - INFO - gateway message: Subscription request 1 for ohlcv-1m data succeeded
+2025-07-17 11:59:57,215 - INFO - added symbology mapping NQU5 to 42008487
+2025-07-17 11:59:57,215 - INFO - Symbol mapping: Unknown -> 42008487
+2025-07-17 11:59:57,227 - INFO - Setting primary contract to 42008487 with avg volume 750.0
+2025-07-17 11:59:57,263 - INFO - gateway message: Finished ohlcv-1m replay
+2025-07-17 12:03:00,062 - INFO - Reached collection time limit, stopping historical data collection
+2025-07-17 12:03:00,062 - INFO - terminating live client
+2025-07-17 12:03:00,063 - INFO - Collected 38 unique minute bars in total
+2025-07-17 12:03:00,063 - INFO - Primary contract identified: 42008487 with avg volume 440.9
+2025-07-17 12:03:00,063 - INFO - Contract 42008487: 38 records (100.0%)
+2025-07-17 12:03:00,063 - INFO - terminating live client
+2025-07-17 12:03:00,063 - INFO - === INSERTING 38 RECORDS INTO DATABASE ===
+2025-07-17 12:03:00,063 - INFO - Sample of data being inserted (showing 3 records):
+2025-07-17 12:03:00,063 - INFO -   RECORD 1/3:
+2025-07-17 12:03:00,063 - INFO -     Symbol:        NQ
+2025-07-17 12:03:00,063 - INFO -     Timestamp:     2025-07-17T18:24:00+00:00 (UTC)
+2025-07-17 12:03:00,063 - INFO -     Open:          $23248.75
+2025-07-17 12:03:00,063 - INFO -     High:          $23258.75
+2025-07-17 12:03:00,063 - INFO -     Low:           $23247.25
+2025-07-17 12:03:00,063 - INFO -     Close:         $23257.50
+2025-07-17 12:03:00,063 - INFO -     Volume:        1085
+2025-07-17 12:03:00,063 - INFO -     Source:        NQ.n.0
+2025-07-17 12:03:00,063 - INFO -   RECORD 2/3:
+2025-07-17 12:03:00,063 - INFO -     Symbol:        NQ
+2025-07-17 12:03:00,063 - INFO -     Timestamp:     2025-07-17T18:25:00+00:00 (UTC)
+2025-07-17 12:03:00,063 - INFO -     Open:          $23257.75
+2025-07-17 12:03:00,063 - INFO -     High:          $23259.75
+2025-07-17 12:03:00,063 - INFO -     Low:           $23253.00
+2025-07-17 12:03:00,063 - INFO -     Close:         $23255.00
+2025-07-17 12:03:00,063 - INFO -     Volume:        710
+2025-07-17 12:03:00,063 - INFO -     Source:        NQ.n.0
+2025-07-17 12:03:00,063 - INFO -   RECORD 3/3:
+2025-07-17 12:03:00,063 - INFO -     Symbol:        NQ
+2025-07-17 12:03:00,063 - INFO -     Timestamp:     2025-07-17T18:26:00+00:00 (UTC)
+2025-07-17 12:03:00,063 - INFO -     Open:          $23255.00
+2025-07-17 12:03:00,063 - INFO -     High:          $23255.75
+2025-07-17 12:03:00,063 - INFO -     Low:           $23251.00
+2025-07-17 12:03:00,063 - INFO -     Close:         $23254.00
+2025-07-17 12:03:00,063 - INFO -     Volume:        455
+2025-07-17 12:03:00,063 - INFO -     Source:        NQ.n.0
+2025-07-17 12:03:01,760 - INFO - Inserted batch 1/1 (38 records)
+2025-07-17 12:03:01,760 - INFO - Successfully inserted 38 records into database
+2025-07-17 12:03:01,786 - INFO - Inserted 38 historical records
+2025-07-17 12:03:01,786 - INFO - Historical backfill completed
+2025-07-17 12:03:01,787 - INFO - Shutdown signal received, stopping live data service...
+2025-07-17 12:37:44,358 - INFO - === STARTING LIVE DATA SERVICE ===
+2025-07-17 12:37:44,360 - INFO - Checking database status before starting...
+2025-07-17 12:37:45,260 - INFO - === DATABASE STATUS ===
+2025-07-17 12:37:45,260 - INFO - Total NQ records: 227415
+2025-07-17 12:37:45,260 - INFO - Time range: 2024-03-31 22:00:00+00:00 to 2025-07-17 19:36:00+00:00 (UTC)
+2025-07-17 12:37:45,316 - INFO - Most recent records:
+2025-07-17 12:37:45,316 - INFO -   RECORD 1/5:
+2025-07-17 12:37:45,316 - INFO -     Timestamp: 2025-07-17 19:36:00
+2025-07-17 12:37:45,316 - INFO -     OHLC: $23268.75/$23269.50/$23265.75/$23266.25
+2025-07-17 12:37:45,316 - INFO -     Volume: 425
+2025-07-17 12:37:45,316 - INFO -     Contract: NQ.n.0
+2025-07-17 12:37:45,316 - INFO -   RECORD 2/5:
+2025-07-17 12:37:45,316 - INFO -     Timestamp: 2025-07-17 19:35:00
+2025-07-17 12:37:45,317 - INFO -     OHLC: $23268.75/$23270.50/$23266.00/$23269.25
+2025-07-17 12:37:45,317 - INFO -     Volume: 466
+2025-07-17 12:37:45,317 - INFO -     Contract: NQ.n.0
+2025-07-17 12:37:45,317 - INFO -   RECORD 3/5:
+2025-07-17 12:37:45,317 - INFO -     Timestamp: 2025-07-17 19:34:00
+2025-07-17 12:37:45,317 - INFO -     OHLC: $23268.50/$23270.50/$23266.00/$23268.75
+2025-07-17 12:37:45,317 - INFO -     Volume: 557
+2025-07-17 12:37:45,317 - INFO -     Contract: NQ.n.0
+2025-07-17 12:37:45,317 - INFO -   RECORD 4/5:
+2025-07-17 12:37:45,317 - INFO -     Timestamp: 2025-07-17 19:33:00
+2025-07-17 12:37:45,317 - INFO -     OHLC: $23271.00/$23271.25/$23267.50/$23268.25
+2025-07-17 12:37:45,317 - INFO -     Volume: 471
+2025-07-17 12:37:45,317 - INFO -     Contract: NQ.n.0
+2025-07-17 12:37:45,317 - INFO -   RECORD 5/5:
+2025-07-17 12:37:45,317 - INFO -     Timestamp: 2025-07-17 19:32:00
+2025-07-17 12:37:45,317 - INFO -     OHLC: $23271.00/$23273.75/$23267.75/$23271.00
+2025-07-17 12:37:45,317 - INFO -     Volume: 872
+2025-07-17 12:37:45,317 - INFO -     Contract: NQ.n.0
+2025-07-17 12:37:45,346 - INFO - Starting historical data load (lookback period: 4 days)...
+2025-07-17 12:37:45,346 - INFO - === INITIALIZING HISTORICAL DATA LOAD ===
+2025-07-17 12:37:45,347 - INFO - Initialized Historical(gateway=https://hist.databento.com)
+2025-07-17 12:37:45,347 - INFO - Using provided start time: 2025-07-17T19:37:00+00:00 (UTC)
+2025-07-17 12:37:45,347 - INFO - ===== STAGE 2: LIVE API (from 2025-07-17T19:37:00+00:00 to now) =====
+2025-07-17 12:37:45,347 - INFO - Subscribing to NQ.n.0 OHLCV data starting from 2025-07-17T19:37:00+00:00 (UTC)...
+2025-07-17 12:37:45,347 - INFO - subscribing to ohlcv-1m:continuous ['NQ.n.0'] start=1752781020000000000 snapshot=False
+2025-07-17 12:37:45,347 - INFO - connecting to remote gateway
+2025-07-17 12:37:45,827 - INFO - authenticated session 1753907452
+2025-07-17 12:37:45,827 - INFO - sending subscription to ohlcv-1m:continuous ['NQ.n.0'] start=1752781020000000000 snapshot=False
+2025-07-17 12:37:45,827 - INFO - Starting to collect recent historical data...
+2025-07-17 12:37:45,828 - INFO - starting live client
+2025-07-17 12:37:46,073 - INFO - gateway message: Subscription request 1 for ohlcv-1m data succeeded
+2025-07-17 12:37:46,073 - INFO - added symbology mapping NQU5 to 42008487
+2025-07-17 12:37:46,073 - INFO - Symbol mapping: Unknown -> 42008487
+2025-07-17 12:37:46,082 - INFO - gateway message: Finished ohlcv-1m replay
+2025-07-17 12:40:00,164 - INFO - Setting primary contract to 42008487 with avg volume 416.3
+2025-07-17 12:41:00,063 - INFO - Reached collection time limit, stopping historical data collection
+2025-07-17 12:41:00,063 - INFO - terminating live client
+2025-07-17 12:41:00,064 - INFO - Collected 3 unique minute bars in total
+2025-07-17 12:41:00,064 - INFO - Primary contract identified: 42008487 with avg volume 416.3
+2025-07-17 12:41:00,064 - INFO - Contract 42008487: 3 records (100.0%)
+2025-07-17 12:41:00,064 - INFO - terminating live client
+2025-07-17 12:41:00,064 - INFO - === INSERTING 3 RECORDS INTO DATABASE ===
+2025-07-17 12:41:00,064 - INFO - Sample of data being inserted (showing 3 records):
+2025-07-17 12:41:00,064 - INFO -   RECORD 1/3:
+2025-07-17 12:41:00,064 - INFO -     Symbol:        NQ
+2025-07-17 12:41:00,064 - INFO -     Timestamp:     2025-07-17T19:37:00+00:00 (UTC)
+2025-07-17 12:41:00,064 - INFO -     Open:          $23266.25
+2025-07-17 12:41:00,064 - INFO -     High:          $23266.75
+2025-07-17 12:41:00,064 - INFO -     Low:           $23262.00
+2025-07-17 12:41:00,064 - INFO -     Close:         $23264.75
+2025-07-17 12:41:00,064 - INFO -     Volume:        502
+2025-07-17 12:41:00,064 - INFO -     Source:        NQ.n.0
+2025-07-17 12:41:00,064 - INFO -   RECORD 2/3:
+2025-07-17 12:41:00,064 - INFO -     Symbol:        NQ
+2025-07-17 12:41:00,064 - INFO -     Timestamp:     2025-07-17T19:38:00+00:00 (UTC)
+2025-07-17 12:41:00,064 - INFO -     Open:          $23264.25
+2025-07-17 12:41:00,064 - INFO -     High:          $23270.00
+2025-07-17 12:41:00,064 - INFO -     Low:           $23263.75
+2025-07-17 12:41:00,064 - INFO -     Close:         $23270.00
+2025-07-17 12:41:00,065 - INFO -     Volume:        320
+2025-07-17 12:41:00,065 - INFO -     Source:        NQ.n.0
+2025-07-17 12:41:00,065 - INFO -   RECORD 3/3:
+2025-07-17 12:41:00,065 - INFO -     Symbol:        NQ
+2025-07-17 12:41:00,065 - INFO -     Timestamp:     2025-07-17T19:39:00+00:00 (UTC)
+2025-07-17 12:41:00,065 - INFO -     Open:          $23269.75
+2025-07-17 12:41:00,065 - INFO -     High:          $23271.25
+2025-07-17 12:41:00,065 - INFO -     Low:           $23269.00
+2025-07-17 12:41:00,065 - INFO -     Close:         $23269.75
+2025-07-17 12:41:00,065 - INFO -     Volume:        427
+2025-07-17 12:41:00,065 - INFO -     Source:        NQ.n.0
+2025-07-17 12:41:00,450 - INFO - Inserted batch 1/1 (3 records)
+2025-07-17 12:41:00,450 - INFO - Successfully inserted 3 records into database
+2025-07-17 12:41:00,480 - INFO - Inserted 3 historical records
+2025-07-17 12:41:00,480 - INFO - Historical backfill completed
+2025-07-17 12:41:00,480 - INFO - Shutdown signal received, stopping live data service...

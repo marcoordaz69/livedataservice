@@ -39,4 +39,24 @@ async def set_tenant_context_db(conn, user_id: Optional[uuid.UUID]) -> None:
         pass
     else:
         # Use set_config directly instead of a wrapper function
-        await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)") 
+        await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+
+async def set_tenant_context(db, user_id: Optional[uuid.UUID]) -> None:
+    """Set the tenant context for a database instance."""
+    if user_id is None:
+        logger.warning("No user_id provided for tenant context")
+        return
+    
+    try:
+        # Ensure the database is connected
+        await db.ensure_connected()
+        
+        # Get a connection from the pool and set the tenant context
+        async with db.pool.acquire() as conn:
+            await set_tenant_context_db(conn, user_id)
+            
+        logger.debug(f"Tenant context set for user: {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to set tenant context for user {user_id}: {str(e)}")
+        raise 

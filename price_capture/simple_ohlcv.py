@@ -11,7 +11,7 @@ from decimal import Decimal
 import time
 
 # Import SetupMonitor and TradingDB
-from price_capture.setup_monitor import SetupMonitor
+from setup_monitor import SetupMonitor
 from database.trading_db import TradingDB
 
 # Configure logging
