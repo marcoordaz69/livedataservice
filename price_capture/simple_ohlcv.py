@@ -686,17 +686,29 @@ async def main():
                         logger.warning("No updates for 5 minutes, attempting to reconnect...")
                         
                         try:
-                            # Stop and restart client
-                            client.stop()
-                            await asyncio.sleep(2)
+                            # Stop current client gracefully
+                            logger.info("Stopping current client...")
+                            try:
+                                client.stop()
+                            except Exception as stop_error:
+                                logger.warning(f"Error stopping client: {stop_error}")
+                            
+                            await asyncio.sleep(3)  # Wait longer for cleanup
+                            
+                            # Create new client instance 
+                            logger.info("Creating new Databento client...")
                             client = db.Live(key=os.getenv("DATABENTO_API_KEY"))
+                            
+                            # Add callbacks using the main event loop
                             client.add_callback(
                                 record_callback=handle_record_sync,
                                 exception_callback=error_callback
                             )
                             
-                            # Resubscribe to OHLCV
+                            # Resubscribe to OHLCV with fresh timestamp
                             start_ts = int((datetime.now(timezone.utc) - timedelta(minutes=10)).timestamp() * 1e9)
+                            logger.info(f"Resubscribing to OHLCV from timestamp {start_ts}...")
+                            
                             client.subscribe(
                                 dataset="GLBX.MDP3",
                                 schema="ohlcv-1m",
@@ -705,11 +717,18 @@ async def main():
                                 start=start_ts
                             )
                             
+                            # Start the client
+                            logger.info("Starting reconnected client...")
                             client.start()
-                            last_update = datetime.now()  # Reset the timer
-                            logger.info("Reconnected successfully")
+                            
+                            # Reset the timer and log success
+                            last_update = datetime.now()
+                            logger.info("✅ Reconnected successfully - data stream restored")
+                            
                         except Exception as reconnect_error:
-                            logger.error(f"Failed to reconnect: {reconnect_error}")
+                            logger.error(f"❌ Failed to reconnect: {reconnect_error}")
+                            logger.error("Will retry on next cycle...")
+                            # Don't crash - let it try again in the next cycle
                     
         except KeyboardInterrupt:
             logger.info("\nShutting down...")
