@@ -450,14 +450,14 @@ async def historical_load(start_timestamp=None):
                         (volume > existing['volume'] * 1.2)):  # Must be 20% higher volume
                         highest_volume_entries[minute_key] = {
                             'timestamp': timestamp,
-                            'symbol': 'NQ',  # Always use NQ as the symbol for consistency
+                            'symbol': symbol_key,  # Use the validated symbol
                             'instrument_id': instrument_id,
                             'open': prices[0],
                             'high': prices[1],
                             'low': prices[2],
                             'close': prices[3],
                             'volume': volume,
-                            'source_contract': symbol if symbol != 'Unknown' else 'NQ.n.0'
+                            'source_contract': symbol if symbol != 'Unknown' else f'{symbol_key}.n.0'
                         }
                 
                 # Log progress periodically
@@ -507,10 +507,10 @@ async def live_data_stream(start_time: datetime):
     global running, reconnect_requested
     
     try:
-        # Get the most recent timestamp from the database
+        # Get the most recent timestamp from the database for any symbol
         conn = await get_db_connection()
         latest_timestamp = await conn.fetchval(
-            "SELECT MAX(timestamp) FROM raw_ohlcv WHERE symbol = 'NQ'"
+            "SELECT MAX(timestamp) FROM raw_ohlcv WHERE symbol IN ('NQ', 'ES')"
         )
         await conn.close()
         
@@ -526,7 +526,12 @@ async def live_data_stream(start_time: datetime):
         start_ts = int(start_time.replace(tzinfo=None).timestamp() * 1e9)  # Convert to nanoseconds
         
         logger.info(f"=== STARTING LIVE DATA STREAM FROM {start_time.isoformat()} (UTC) ===")
-        logger.info(f"Subscribing to OHLCV-1m data for NQ.FUT starting from {start_time.isoformat()} (UTC)")
+        
+        # Get enabled symbols from environment or default to NQ
+        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ').split(',')
+        enabled_symbols = [s.strip() for s in enabled_symbols]
+        logger.info(f"Subscribing to OHLCV-1m data for symbols: {enabled_symbols}")
+        
         client = db.Live(key=api_key)
         
         # Dictionary to store symbol mappings
@@ -539,12 +544,24 @@ async def live_data_stream(start_time: datetime):
         current_minute_data = {}
         last_processed_minute = None
         
-        # Subscribe to live data
+        # Subscribe to live data for all enabled symbols
+        databento_symbols = []
+        for symbol in enabled_symbols:
+            if symbol in SYMBOL_CONFIG:
+                databento_symbols.append(SYMBOL_CONFIG[symbol]['databento_symbol'])
+                logger.info(f"Added {symbol} -> {SYMBOL_CONFIG[symbol]['databento_symbol']} to subscription")
+            else:
+                logger.warning(f"Unknown symbol {symbol}, skipping")
+        
+        if not databento_symbols:
+            logger.error("No valid symbols to subscribe to")
+            return
+        
         client.subscribe(
             dataset="GLBX.MDP3",
             schema="ohlcv-1m",
-            stype_in="parent",
-            symbols=["NQ.FUT"],
+            stype_in="continuous",  # Use continuous for smart symbology
+            symbols=databento_symbols,
             start=start_ts
         )
         
@@ -652,6 +669,28 @@ async def live_data_stream(start_time: datetime):
                               format_price(getattr(record, 'low', 0)),
                               format_price(getattr(record, 'close', 0)))
                     
+                    # Determine normalized symbol from price range and contract
+                    avg_price = sum(prices) / len(prices)
+                    normalized_symbol = 'NQ'  # Default
+                    
+                    # Try to determine symbol from price range
+                    for sym_key, config in SYMBOL_CONFIG.items():
+                        if validate_price_range(sym_key, avg_price):
+                            normalized_symbol = config['db_symbol']
+                            break
+                    
+                    # Double-check with contract name if available
+                    if symbol != 'Unknown':
+                        if 'ES' in symbol.upper():
+                            normalized_symbol = 'ES'
+                        elif 'NQ' in symbol.upper():
+                            normalized_symbol = 'NQ'
+                    
+                    # Validate the determined symbol
+                    if not validate_price_range(normalized_symbol, avg_price):
+                        logger.warning(f"Skipping record with invalid {normalized_symbol} price: {avg_price:.2f} at {timestamp.isoformat()}")
+                        continue
+                    
                     # Add to contract tracker
                     contract_tracker.add_record(instrument_id, symbol, timestamp, prices, volume)
                     
@@ -680,7 +719,7 @@ async def live_data_stream(start_time: datetime):
                         # Store/update data for this minute
                         current_minute_data[minute_key] = {
                             'timestamp': timestamp,
-                            'symbol': 'NQ',  # Always use NQ as the symbol for consistency
+                            'symbol': normalized_symbol,  # Use the determined symbol
                             'instrument_id': instrument_id,
                             'open': prices[0],
                             'high': prices[1],
@@ -780,50 +819,60 @@ async def check_db_status():
     try:
         conn = await get_db_connection()
         
-        # Get count of records
-        count = await conn.fetchval("SELECT COUNT(*) FROM raw_ohlcv WHERE symbol = 'NQ'")
+        # Get count of records for all symbols
+        symbol_counts = await conn.fetch("""
+            SELECT symbol, COUNT(*) as count
+            FROM raw_ohlcv 
+            WHERE symbol IN ('NQ', 'ES')
+            GROUP BY symbol
+            ORDER BY symbol
+        """)
         
-        # Get time range
+        # Get time range for all symbols
         range_result = await conn.fetchrow("""
             SELECT 
                 MIN(timestamp) AS min_time,
                 MAX(timestamp) AS max_time
             FROM raw_ohlcv 
-            WHERE symbol = 'NQ'
+            WHERE symbol IN ('NQ', 'ES')
         """)
         
         min_time = range_result['min_time'] if range_result else None
         max_time = range_result['max_time'] if range_result else None
         
         logger.info("=== DATABASE STATUS ===")
-        logger.info(f"Total NQ records: {count}")
+        for row in symbol_counts:
+            logger.info(f"Total {row['symbol']} records: {row['count']}")
         
         if min_time and max_time:
             logger.info(f"Time range: {min_time} to {max_time} (UTC)")
             
-            # Get most recent records to check price consistency
-            recent_records = await conn.fetch("""
-                SELECT timestamp AT TIME ZONE 'UTC' as ts_utc, open, high, low, close, volume, source_contract
-                FROM raw_ohlcv
-                WHERE symbol = 'NQ'
-                ORDER BY timestamp DESC
-                LIMIT 5
-            """)
+            # Get most recent records for each symbol to check price consistency
+            for symbol_row in symbol_counts:
+                symbol = symbol_row['symbol']
+                recent_records = await conn.fetch("""
+                    SELECT timestamp AT TIME ZONE 'UTC' as ts_utc, open, high, low, close, volume, source_contract
+                    FROM raw_ohlcv
+                    WHERE symbol = $1
+                    ORDER BY timestamp DESC
+                    LIMIT 3
+                """, symbol)
+                
+                if recent_records:
+                    logger.info(f"Most recent {symbol} records:")
+                    for i, record in enumerate(recent_records, 1):
+                        logger.info(f"  {symbol} RECORD {i}/3:")
+                        logger.info(f"    Timestamp: {record['ts_utc']}")
+                        logger.info(f"    OHLC: ${record['open']:.2f}/${record['high']:.2f}/${record['low']:.2f}/${record['close']:.2f}")
+                        logger.info(f"    Volume: {record['volume']}")
+                        logger.info(f"    Contract: {record['source_contract']}")
+                        
+                    # Check for price anomalies
+                    prices = [record['close'] for record in recent_records]
+                    if prices and max(prices) / min(prices) > 1.03:  # 3% difference
+                        logger.warning(f"⚠️ PRICE ANOMALY DETECTED for {symbol}: Recent prices vary by more than 3%")
+                        logger.warning(f"  Recent {symbol} prices: {', '.join([f'${p:.2f}' for p in prices])}")
             
-            if recent_records:
-                logger.info("Most recent records:")
-                for i, record in enumerate(recent_records, 1):
-                    logger.info(f"  RECORD {i}/5:")
-                    logger.info(f"    Timestamp: {record['ts_utc']}")
-                    logger.info(f"    OHLC: ${record['open']:.2f}/${record['high']:.2f}/${record['low']:.2f}/${record['close']:.2f}")
-                    logger.info(f"    Volume: {record['volume']}")
-                    logger.info(f"    Contract: {record['source_contract']}")
-                    
-                # Check for price anomalies
-                prices = [record['close'] for record in recent_records]
-                if prices and max(prices) / min(prices) > 1.03:  # 3% difference
-                    logger.warning("⚠️ PRICE ANOMALY DETECTED: Recent prices vary by more than 3%")
-                    logger.warning(f"  Recent prices: {', '.join([f'${p:.2f}' for p in prices])}")
         else:
             logger.info("No records found in database")
             

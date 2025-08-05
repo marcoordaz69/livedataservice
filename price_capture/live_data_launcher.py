@@ -6,6 +6,7 @@ import sys
 import time
 import os
 import logging
+import signal
 from datetime import datetime, timedelta, timezone
 import asyncpg
 from dotenv import load_dotenv
@@ -42,8 +43,8 @@ def ensure_env_vars():
         return False
     return True
 
-async def get_db_connection():
-    """Get a connection to the database."""
+async def get_db_connection(max_retries=3, retry_delay=2):
+    """Get a connection to the database with retry logic."""
     host = os.getenv('host')
     user = os.getenv('user')
     password = os.getenv('password')
@@ -53,15 +54,34 @@ async def get_db_connection():
     if not all([host, user, password]):
         raise ValueError("Missing required database environment variables (host, user, password)")
     
-    conn = await asyncpg.connect(
-        user=user,
-        password=password,
-        database=dbname,
-        host=host,
-        port=int(port),
-        ssl='require'  # Supabase requires SSL
-    )
-    return conn
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            conn = await asyncpg.connect(
+                user=user,
+                password=password,
+                database=dbname,
+                host=host,
+                port=int(port),
+                ssl='require',  # Supabase requires SSL
+                command_timeout=30,  # 30 second timeout
+                server_settings={
+                    'application_name': 'livedataservice'
+                }
+            )
+            if attempt > 0:
+                logger.info(f"Database connection successful on attempt {attempt + 1}")
+            return conn
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                logger.warning(f"Database connection attempt {attempt + 1} failed: {e}")
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error(f"All {max_retries} database connection attempts failed")
+    
+    raise last_error
 
 async def check_last_data_timestamp():
     """Check the database for the most recent timestamp in the raw_ohlcv table."""
@@ -180,10 +200,12 @@ async def run_live_stream():
         env = os.environ.copy()
         
         # Set PYTHONPATH to ensure modules can be found
+        # Add both current directory and parent directory to Python path
+        parent_dir = os.path.dirname(os.getcwd())
         if "PYTHONPATH" in env:
-            env["PYTHONPATH"] = f"{os.getcwd()}:{env['PYTHONPATH']}"
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
         else:
-            env["PYTHONPATH"] = os.getcwd()
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
         
         # Set asyncio debug mode to help identify any remaining issues
         env["PYTHONASYNCIODEBUG"] = "1"
@@ -268,10 +290,12 @@ async def run_setup_monitor():
         
         # Set up the environment for the monitor process
         env = os.environ.copy()
+        # Add both current directory and parent directory to Python path
+        parent_dir = os.path.dirname(os.getcwd())
         if "PYTHONPATH" in env:
-            env["PYTHONPATH"] = f"{os.getcwd()}:{env['PYTHONPATH']}"
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
         else:
-            env["PYTHONPATH"] = os.getcwd()
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
             
         # Add event loop isolation settings
         env["PYTHONASYNCIODEBUG"] = "1"
@@ -336,6 +360,19 @@ async def main():
     
     live_process = None
     monitor_process = None
+    shutdown_event = asyncio.Event()
+    
+    # Set up signal handlers for graceful shutdown
+    def signal_handler(signame):
+        logger.info(f"Received {signame}, initiating graceful shutdown...")
+        shutdown_event.set()
+    
+    # Register signal handlers
+    if sys.platform != 'win32':
+        for sig in [signal.SIGTERM, signal.SIGINT]:
+            asyncio.get_event_loop().add_signal_handler(
+                sig, lambda s=sig: signal_handler(signal.Signals(s).name)
+            )
     
     try:
         if args.backfill_only:
@@ -360,15 +397,15 @@ async def main():
                 if not monitor_process:
                     logger.warning("Failed to start trade setup monitor, continuing without it")
             
-            # Keep running until interrupted
-            while True:
+            # Keep running until shutdown signal or process failure
+            while not shutdown_event.is_set():
                 await asyncio.sleep(1)
                 
                 # Check if live process is still running
                 if live_process.poll() is not None:
                     exit_code = live_process.poll()
                     logger.error(f"Live stream process ended unexpectedly with exit code {exit_code}")
-                    sys.exit(1)
+                    break
                 
                 # Check if monitor process is still running (if it was started)
                 if monitor_process and monitor_process.poll() is not None:
@@ -407,15 +444,15 @@ async def main():
                 if not monitor_process:
                     logger.warning("Failed to start trade setup monitor, continuing without it")
             
-            # Keep running until interrupted
-            while True:
+            # Keep running until shutdown signal or process failure
+            while not shutdown_event.is_set():
                 await asyncio.sleep(1)
                 
                 # Check if live process is still running
                 if live_process.poll() is not None:
                     exit_code = live_process.poll()
                     logger.error(f"Live stream process ended unexpectedly with exit code {exit_code}")
-                    sys.exit(1)
+                    break
                 
                 # Check if monitor process is still running (if it was started)
                 if monitor_process and monitor_process.poll() is not None:

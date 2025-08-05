@@ -23,7 +23,7 @@ def check_environment():
     logger.info("=== RAILWAY ENVIRONMENT CHECK ===")
     
     required_vars = ["DATABENTO_API_KEY", "host", "user", "password"]
-    optional_vars = ["port", "dbname"]
+    optional_vars = ["port", "dbname", "PORT"]
     
     missing_vars = []
     for var in required_vars:
@@ -49,6 +49,27 @@ def check_environment():
     logger.info("✅ All required environment variables are set")
     return True
 
+async def run_with_health_check(main_coro):
+    """Run main coroutine alongside health check server"""
+    from health_check import run_health_server
+    
+    # Start health check server as background task
+    health_task = asyncio.create_task(run_health_server())
+    
+    try:
+        # Run main launcher
+        await main_coro()
+    except Exception as e:
+        logger.error(f"Main launcher failed: {e}")
+        raise
+    finally:
+        # Cleanup health server
+        health_task.cancel()
+        try:
+            await health_task
+        except asyncio.CancelledError:
+            pass
+
 if __name__ == "__main__":
     # Check environment first
     if not check_environment():
@@ -71,7 +92,7 @@ if __name__ == "__main__":
             # Modify sys.argv to add --live-only flag
             sys.argv.extend(['--live-only'])
         
-        asyncio.run(main())
+        asyncio.run(run_with_health_check(main()))
     except KeyboardInterrupt:
         logger.info("Launcher terminated by user")
     except Exception as e:

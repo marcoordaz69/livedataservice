@@ -11,8 +11,24 @@ from decimal import Decimal
 import time
 
 # Import SetupMonitor and TradingDB
-from price_capture.setup_monitor import SetupMonitor
-from database.trading_db import TradingDB
+from setup_monitor import SetupMonitor
+from database.db_factory import get_db
+
+# Symbol configuration
+SYMBOL_CONFIG = {
+    'NQ': {
+        'databento_symbol': 'NQ.n.0',
+        'db_symbol': 'NQ',
+        'price_range': {'min': 10000, 'max': 50000},
+        'description': 'NASDAQ 100 E-mini'
+    },
+    'ES': {
+        'databento_symbol': 'ES.n.0',
+        'db_symbol': 'ES',
+        'price_range': {'min': 2000, 'max': 10000},
+        'description': 'S&P 500 E-mini'
+    }
+}
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +81,29 @@ def format_price(price):
     if isinstance(price, (int, float)):
         return price / 1000000000
     return price
+
+def validate_price_range(symbol, price):
+    """Validate if a price is within the expected range for a symbol."""
+    if symbol not in SYMBOL_CONFIG:
+        logger.warning(f"Unknown symbol {symbol}, allowing price {price}")
+        return True
+    
+    config = SYMBOL_CONFIG[symbol]
+    min_price = config['price_range']['min']
+    max_price = config['price_range']['max']
+    
+    if min_price <= price <= max_price:
+        return True
+    else:
+        logger.warning(f"Price {price:.2f} for {symbol} outside expected range {min_price}-{max_price}")
+        return False
+
+def determine_symbol_from_price(price):
+    """Determine symbol from price range."""
+    for symbol, config in SYMBOL_CONFIG.items():
+        if validate_price_range(symbol, price):
+            return config['db_symbol']
+    return 'NQ'  # Default fallback
 
 async def create_db_pool():
     """Create and return a database connection pool."""
@@ -169,19 +208,22 @@ async def insert_ohlcv_data(data_record):
             data_record['source_contract']
             )
             
-            # Update cache after successful insert
-            if data_record['symbol'] == 'NQ':
-                latest_price_cache['timestamp'] = data_record['timestamp']
-                latest_price_cache['data'] = {
-                    'timestamp': data_record['timestamp'],
-                    'open': data_record['open'],
-                    'high': data_record['high'],
-                    'low': data_record['low'],
-                    'close': data_record['close'],
-                    'volume': data_record['volume'],
-                    'source_contract': data_record['source_contract']
-                }
-                latest_price_cache['last_update'] = time.time()
+            # Update cache after successful insert (for any symbol)
+            symbol = data_record['symbol']
+            if symbol not in latest_price_cache:
+                latest_price_cache[symbol] = {}
+            
+            latest_price_cache[symbol]['timestamp'] = data_record['timestamp']
+            latest_price_cache[symbol]['data'] = {
+                'timestamp': data_record['timestamp'],
+                'open': data_record['open'],
+                'high': data_record['high'],
+                'low': data_record['low'],
+                'close': data_record['close'],
+                'volume': data_record['volume'],
+                'source_contract': data_record['source_contract']
+            }
+            latest_price_cache[symbol]['last_update'] = time.time()
             
             logger.info(f"Inserted/Updated record for {data_record['timestamp'].isoformat()} UTC")
     except Exception as e:
@@ -211,15 +253,23 @@ def process_record(record):
         
         # Get volume and symbol
         volume = getattr(record, 'volume', 0)
-        symbol = getattr(record, 'symbol', 'NQ.n.0')
+        raw_symbol = getattr(record, 'symbol', 'NQ.n.0')
         
-        # For front month contract tracking, always use NQ.n.0
-        # This is the most accurate way to track front month
-        source_contract = 'NQ.n.0'
+        # Determine the normalized symbol from price
+        avg_price = sum([open_price, high_price, low_price, close_price]) / 4
+        normalized_symbol = determine_symbol_from_price(avg_price)
+        
+        # Validate the price for the determined symbol
+        if not validate_price_range(normalized_symbol, avg_price):
+            logger.warning(f"Skipping record with invalid {normalized_symbol} price: {avg_price:.2f} at {timestamp.isoformat()}")
+            return None
+        
+        # Set source contract based on determined symbol
+        source_contract = SYMBOL_CONFIG[normalized_symbol]['databento_symbol']
         
         # Prepare data record
         data_record = {
-            'symbol': 'NQ',  # Always use NQ as the normalized symbol
+            'symbol': normalized_symbol,  # Use the determined symbol
             'timestamp': timestamp,
             'open': open_price,
             'high': high_price,
@@ -229,17 +279,18 @@ def process_record(record):
             'source_contract': source_contract
         }
         
-        # Track data by minute
-        if minute_key not in minute_data_cache:
-            minute_data_cache[minute_key] = data_record
-            logger.info(f"New entry for {minute_key}: {symbol} with volume {volume}")
-        elif volume > minute_data_cache[minute_key]['volume'] * 1.5:
+        # Track data by minute with symbol awareness
+        cache_key = f"{minute_key}_{normalized_symbol}"  # Include symbol in cache key
+        if cache_key not in minute_data_cache:
+            minute_data_cache[cache_key] = data_record
+            logger.info(f"New entry for {minute_key}: {normalized_symbol} with volume {volume}")
+        elif volume > minute_data_cache[cache_key]['volume'] * 1.5:
             # Update if this has 50% more volume
-            minute_data_cache[minute_key] = data_record
-            logger.info(f"Updated highest volume entry for {minute_key}: {symbol} with volume {volume}")
+            minute_data_cache[cache_key] = data_record
+            logger.info(f"Updated highest volume entry for {minute_key}: {normalized_symbol} with volume {volume}")
         
         # Log the data
-        logger.info(f"\n{timestamp.isoformat()} UTC | Front month contract: {source_contract}")
+        logger.info(f"\n{timestamp.isoformat()} UTC | {normalized_symbol} contract: {source_contract}")
         logger.info(f"Open:   ${open_price:.2f}")
         logger.info(f"High:   ${high_price:.2f}")
         logger.info(f"Low:    ${low_price:.2f}")
@@ -250,8 +301,10 @@ def process_record(record):
         # Cleanup minute_data_cache - remove entries older than 10 minutes
         current_minute = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:00')
         for key in list(minute_data_cache.keys()):
+            # Extract minute from cache key (format: YYYY-MM-DD HH:MM:00_SYMBOL)
+            minute_part = key.rsplit('_', 1)[0] if '_' in key else key
             # If this isn't the current minute and we have a stored record
-            if key != current_minute and key in minute_data_cache:
+            if minute_part != current_minute and key in minute_data_cache:
                 entry = minute_data_cache[key]
                 
                 # Check if enough time has passed to consider it complete (at least 30 seconds)
@@ -328,14 +381,16 @@ async def process_minute_data_cache():
                             logger.error(f"Error inserting data in process_minute_data_cache: {e}", exc_info=True)
                         
                         # Validate setups against this price data, just like in handle_record
-                        if setup_monitor and entry['symbol'] == 'NQ':
+                        # Support both NQ and ES symbols
+                        symbol = entry['symbol']
+                        if setup_monitor and symbol in ['NQ', 'ES']:
                             try:
                                 # Ensure DB connection is valid
                                 await setup_monitor.db.ensure_connected()
                                 
-                                # Get the latest data directly from the database instead of using just the cached data
+                                # Get the latest data directly from the database for this symbol
                                 # This ensures we're always using the most recent data for validation
-                                latest_data = await get_latest_ohlcv_from_db()
+                                latest_data = await get_latest_ohlcv_from_db(symbol)
                                 
                                 if latest_data:
                                     # Use the latest data from the database
@@ -343,7 +398,7 @@ async def process_minute_data_cache():
                                     high_price = Decimal(str(latest_data['high']))
                                     low_price = Decimal(str(latest_data['low']))
                                     
-                                    logger.info(f"Using latest database data for setup validation:")
+                                    logger.info(f"Using latest database data for {symbol} setup validation:")
                                     logger.info(f"  Timestamp: {latest_data['timestamp'].isoformat()} UTC")
                                     logger.info(f"  Price range: ${float(low_price):.2f}-${float(high_price):.2f}")
                                     logger.info(f"  Close: ${float(close_price):.2f}")
@@ -353,16 +408,17 @@ async def process_minute_data_cache():
                                     high_price = Decimal(str(entry['high']))
                                     low_price = Decimal(str(entry['low']))
                                     
-                                    logger.info(f"Falling back to cached data for setup validation:")
+                                    logger.info(f"Falling back to cached data for {symbol} setup validation:")
                                     logger.info(f"  Timestamp: {entry['timestamp'].isoformat()} UTC")
                                     logger.info(f"  Price range: ${float(low_price):.2f}-${float(high_price):.2f}")
                                     logger.info(f"  Close: ${float(close_price):.2f}")
                                 
-                                logger.info(f"Checking cached minute data against price range: ${float(low_price):.2f}-${float(high_price):.2f}")
+                                logger.info(f"Checking {symbol} cached minute data against price range: ${float(low_price):.2f}-${float(high_price):.2f}")
                                 
-                                # Use full price range for validation
+                                # Use full price range for validation with the appropriate symbol
+                                setup_symbol = f'{symbol}.FUT'  # Convert NQ -> NQ.FUT, ES -> ES.FUT
                                 results = await setup_monitor.check_price(
-                                    symbol='NQ.FUT',
+                                    symbol=setup_symbol,
                                     close_price=close_price,
                                     high_price=high_price,
                                     low_price=low_price
@@ -426,17 +482,18 @@ async def handle_record(record):
                 
                 # Only check setups periodically to reduce overhead
                 current_time = time.time()
-                if setup_monitor and data_record['symbol'] == 'NQ' and (current_time - last_setup_check) >= setup_check_interval:
+                symbol = data_record['symbol']
+                if setup_monitor and symbol in ['NQ', 'ES'] and (current_time - last_setup_check) >= setup_check_interval:
                     try:
                         # Update last check timestamp
                         last_setup_check = current_time
                         
                         # Use cached data if available, otherwise query the database
-                        if latest_price_cache['data'] and latest_price_cache['timestamp']:
-                            latest_data = latest_price_cache['data']
-                            logger.info(f"Using cached price data for setup validation (age: {current_time - latest_price_cache['last_update']:.1f}s)")
+                        if symbol in latest_price_cache and latest_price_cache[symbol].get('data') and latest_price_cache[symbol].get('timestamp'):
+                            latest_data = latest_price_cache[symbol]['data']
+                            logger.info(f"Using cached {symbol} price data for setup validation (age: {current_time - latest_price_cache[symbol]['last_update']:.1f}s)")
                         else:
-                            latest_data = await get_latest_ohlcv_from_db()
+                            latest_data = await get_latest_ohlcv_from_db(symbol)
                         
                         if latest_data:
                             # Use the price data for validation
@@ -444,12 +501,13 @@ async def handle_record(record):
                             high_price = Decimal(str(latest_data['high']))
                             low_price = Decimal(str(latest_data['low']))
                             
-                            logger.info(f"Checking trade setups against price range: ${float(low_price):.2f}-${float(high_price):.2f} (close: ${float(close_price):.2f})")
+                            logger.info(f"Checking {symbol} trade setups against price range: ${float(low_price):.2f}-${float(high_price):.2f} (close: ${float(close_price):.2f})")
                             
                             # Check the setups
                             setup_check_start = time.time()
+                            setup_symbol = f'{symbol}.FUT'  # Convert NQ -> NQ.FUT, ES -> ES.FUT
                             results = await setup_monitor.check_price(
-                                symbol='NQ.FUT',
+                                symbol=setup_symbol,
                                 close_price=close_price,
                                 high_price=high_price,
                                 low_price=low_price
@@ -457,7 +515,7 @@ async def handle_record(record):
                             setup_check_time = time.time() - setup_check_start
                             
                             if setup_check_time > 2.0:
-                                logger.warning(f"[PERF] Setup check took {setup_check_time:.3f}s for {len(setup_monitor.active_setups.get('NQ.FUT', {}))} setups")
+                                logger.warning(f"[PERF] Setup check took {setup_check_time:.3f}s for {len(setup_monitor.active_setups.get(setup_symbol, {}))} setups")
                             
                             # Log any triggered setups
                             if results:
@@ -488,8 +546,8 @@ async def handle_record(record):
             else:
                 logger.warning(f"[PERF] handle_record took {total_time:.3f}s for unknown record")
 
-async def get_latest_ohlcv_from_db():
-    """Fetch the latest OHLCV data from the database for the NQ symbol."""
+async def get_latest_ohlcv_from_db(symbol='NQ'):
+    """Fetch the latest OHLCV data from the database for the specified symbol."""
     start_time = time.time()
     conn = None
     
@@ -503,25 +561,25 @@ async def get_latest_ohlcv_from_db():
             logger.warning(f"[PERF] Connection acquisition in get_latest_ohlcv_from_db took {conn_time:.3f}s")
         
         try:
-            # Query to get the most recent record
+            # Query to get the most recent record for the specified symbol
             query = """
                 SELECT timestamp, open, high, low, close, volume, source_contract 
                 FROM raw_ohlcv 
-                WHERE symbol = 'NQ' 
+                WHERE symbol = $1 
                 ORDER BY timestamp DESC 
                 LIMIT 1
             """
             
             # Execute the query
             query_start = time.time()
-            row = await conn.fetchrow(query)
+            row = await conn.fetchrow(query, symbol)
             query_time = time.time() - query_start
             
             if query_time > 1.0:
                 logger.warning(f"[PERF] Query execution in get_latest_ohlcv_from_db took {query_time:.3f}s")
             
             if not row:
-                logger.warning("No OHLCV data found in database for NQ")
+                logger.warning(f"No OHLCV data found in database for {symbol}")
                 return None
                 
             # Convert row to dictionary
@@ -589,8 +647,8 @@ async def main():
         
         # Initialize database connection
         logger.info("Initializing database connection...")
-        db_conn = TradingDB()
-        await db_conn.connect()
+        db_conn = get_db()
+        await db_conn.ensure_connected()
         logger.info("Database connection established")
         
         # Initialize setup monitor
@@ -598,13 +656,20 @@ async def main():
         setup_monitor = SetupMonitor(db_conn)
         logger.info("Setup monitor initialized")
         
-        # No need for db_lock, directly refresh setups
-        await setup_monitor.refresh_setups('NQ.FUT')
-        setup_count = setup_monitor.get_active_setup_count('NQ.FUT')
+        # Get enabled symbols for initial setup loading
+        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ').split(',')
+        enabled_symbols = [s.strip() for s in enabled_symbols]
         
-        # Get detailed counts of open and active setups
-        open_count, active_count = await get_setup_status_counts(setup_monitor, 'NQ.FUT')
-        logger.info(f"Loaded {setup_count} trade setups for NQ.FUT (Open: {open_count}, Active: {active_count})")
+        # Load setups for all enabled symbols
+        for symbol in enabled_symbols:
+            if symbol in SYMBOL_CONFIG:
+                setup_symbol = f'{symbol}.FUT'
+                await setup_monitor.refresh_setups(setup_symbol)
+                setup_count = setup_monitor.get_active_setup_count(setup_symbol)
+                
+                # Get detailed counts of open and active setups
+                open_count, active_count = await get_setup_status_counts(setup_monitor, setup_symbol)
+                logger.info(f"Loaded {setup_count} trade setups for {setup_symbol} (Open: {open_count}, Active: {active_count})")
         
         logger.info("Initializing Databento client...")
         client = db.Live(key=os.getenv("DATABENTO_API_KEY"))
@@ -615,10 +680,22 @@ async def main():
             exception_callback=error_callback
         )
         
-        # Use the smart symbology NQ.n.0 which always resolves to the front month contract
-        # n = highest open interest, 0 = first contract (front month)
-        symbol = "NQ.n.0"
-        logger.info(f"Subscribing to {symbol} 1-minute OHLCV data using SMART SYMBOLOGY...")
+        # Symbols already loaded above for setup monitoring
+        
+        # Build list of databento symbols to subscribe to
+        databento_symbols = []
+        for symbol in enabled_symbols:
+            if symbol in SYMBOL_CONFIG:
+                databento_symbols.append(SYMBOL_CONFIG[symbol]['databento_symbol'])
+                logger.info(f"Added {symbol} -> {SYMBOL_CONFIG[symbol]['databento_symbol']} to subscription")
+            else:
+                logger.warning(f"Unknown symbol {symbol}, skipping")
+        
+        if not databento_symbols:
+            logger.error("No valid symbols to subscribe to")
+            return
+        
+        logger.info(f"Subscribing to {databento_symbols} 1-minute OHLCV data using SMART SYMBOLOGY...")
         
         # Start from 10 minutes ago
         start_time = datetime.now(timezone.utc) - timedelta(minutes=10)
@@ -626,11 +703,11 @@ async def main():
         
         try:
             # Subscribe to OHLCV data with stype_in='continuous' for smart symbology
-            logger.info("Subscribing to OHLCV schema with SMART SYMBOLOGY...")
+            logger.info(f"Subscribing to OHLCV schema for symbols: {databento_symbols}")
             client.subscribe(
                 dataset="GLBX.MDP3",
                 schema="ohlcv-1m",
-                symbols=[symbol],
+                symbols=databento_symbols,
                 stype_in="continuous",  # KEY PARAMETER: Use continuous symbology
                 start=start_ts,
             )
@@ -661,7 +738,7 @@ async def main():
                     current_time = datetime.now()
                     logger.info(f"Stream active - Last update: {(current_time - last_update).seconds}s ago")
                     logger.info(f"Current minute data cache size: {len(minute_data_cache)}")
-                    logger.info(f"Using front month contract: NQ.n.0 (smart symbology)")
+                    logger.info(f"Using front month contracts: {databento_symbols} (smart symbology)")
                     
                     # Refresh setup monitor periodically 
                     if count % 12 == 0:  # Every 60 seconds
@@ -671,13 +748,16 @@ async def main():
                             # Ensure DB connection is valid
                             await setup_monitor.db.ensure_connected()
                             
-                            # Use NQ.FUT as symbol for trade setups
-                            await setup_monitor.refresh_setups('NQ.FUT')
-                            setup_count = setup_monitor.get_active_setup_count('NQ.FUT')
-                            
-                            # Get detailed counts of open and active setups
-                            open_count, active_count = await get_setup_status_counts(setup_monitor, 'NQ.FUT')
-                            logger.info(f"Now tracking {setup_count} setups for NQ.FUT (Open: {open_count}, Active: {active_count})")
+                            # Refresh setups for all enabled symbols
+                            for symbol in enabled_symbols:
+                                if symbol in SYMBOL_CONFIG:
+                                    setup_symbol = f'{symbol}.FUT'
+                                    await setup_monitor.refresh_setups(setup_symbol)
+                                    setup_count = setup_monitor.get_active_setup_count(setup_symbol)
+                                    
+                                    # Get detailed counts of open and active setups
+                                    open_count, active_count = await get_setup_status_counts(setup_monitor, setup_symbol)
+                                    logger.info(f"Now tracking {setup_count} setups for {setup_symbol} (Open: {open_count}, Active: {active_count})")
                         except Exception as refresh_error:
                             logger.error(f"Error refreshing setups: {refresh_error}")
                     
@@ -695,12 +775,12 @@ async def main():
                                 exception_callback=error_callback
                             )
                             
-                            # Resubscribe to OHLCV
+                            # Resubscribe to OHLCV for all symbols
                             start_ts = int((datetime.now(timezone.utc) - timedelta(minutes=10)).timestamp() * 1e9)
                             client.subscribe(
                                 dataset="GLBX.MDP3",
                                 schema="ohlcv-1m",
-                                symbols=[symbol],
+                                symbols=databento_symbols,
                                 stype_in="continuous",  # KEY PARAMETER: Use continuous symbology
                                 start=start_ts
                             )

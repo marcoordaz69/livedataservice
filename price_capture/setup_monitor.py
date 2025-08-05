@@ -206,7 +206,7 @@ class SetupMonitor:
         """Get the most recent OHLCV data for a symbol from the database
         
         Args:
-            symbol: The trading symbol (e.g., 'NQ')
+            symbol: The trading symbol (e.g., 'NQ', 'ES')
             
         Returns:
             Dictionary with the latest OHLCV data or None if not found
@@ -324,8 +324,8 @@ class SetupMonitor:
         processed_setups = set()  # Track which setups we've handled
         
         # Get the latest OHLCV data from the database to ensure we're using the most up-to-date information
-        # Use the normalized symbol 'NQ' for database queries
-        db_symbol = 'NQ' if symbol.startswith('NQ') else symbol
+        # Extract the base symbol for database queries (e.g., 'NQ' from 'NQ.FUT', 'ES' from 'ES.FUT')
+        db_symbol = symbol.split('.')[0] if '.' in symbol else symbol
         
         ohlcv_start = time.time()
         latest_ohlcv = await self.get_latest_ohlcv(db_symbol)

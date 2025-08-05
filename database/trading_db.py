@@ -11,6 +11,18 @@ import logging
 from database.tenant_utils import get_current_user_id
 import asyncio
 
+# Symbol configuration for price validation
+SYMBOL_CONFIG = {
+    'NQ': {
+        'price_range': {'min': 10000, 'max': 50000},
+        'description': 'NASDAQ 100 E-mini'
+    },
+    'ES': {
+        'price_range': {'min': 2000, 'max': 10000},
+        'description': 'S&P 500 E-mini'
+    }
+}
+
 # Global connection reference counter
 connection_counter = 0
 connection_counter_lock = asyncio.Lock()
@@ -360,6 +372,22 @@ class TradingDB:
                 # Validate inputs
                 if any(v is None for v in [entry_zone_low, entry_zone_high, take_profit, stop_loss]):
                     raise ValueError("All price values must be non-null")
+                
+                # Extract base symbol for price validation
+                base_symbol = symbol.split('.')[0] if '.' in symbol else symbol
+                
+                # Validate all prices are within symbol's expected range
+                prices_to_validate = [entry_zone_low, entry_zone_high, take_profit, stop_loss]
+                for price in prices_to_validate:
+                    if base_symbol in SYMBOL_CONFIG:
+                        config = SYMBOL_CONFIG[base_symbol]
+                        min_price = config['price_range']['min']
+                        max_price = config['price_range']['max']
+                        
+                        if not (min_price <= price <= max_price):
+                            raise ValueError(
+                                f"Price {price:.2f} for {base_symbol} outside expected range {min_price}-{max_price}"
+                            )
                     
                 # Ensure entry zone is ordered correctly
                 if entry_zone_low > entry_zone_high:
@@ -466,6 +494,20 @@ class TradingDB:
             
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                # Get user_id from the setup record (since livedataservice has no user context)
+                setup_data = await conn.fetchrow("""
+                    SELECT user_id FROM trade_setups WHERE id = $1
+                """, setup_id)
+                
+                if not setup_data:
+                    self.logger.error(f"No setup found with ID {setup_id}")
+                    raise ValueError(f"No setup found with ID {setup_id}")
+                
+                user_id = setup_data['user_id']
+                if user_id:
+                    await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+                    self.logger.info(f"Set tenant context for user {user_id} in record_trade_entry (from setup)")
+                
                 # Create trade record with execution quality metrics
                 trade_id = await conn.fetchval("""
                     INSERT INTO trades (
@@ -473,12 +515,13 @@ class TradingDB:
                         entry_price,
                         entry_time,
                         quoted_entry_price,
-                        slippage_ticks
+                        slippage_ticks,
+                        user_id
                     )
-                    VALUES ($1, $2, $3, $4, $5)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     RETURNING id
                 """, setup_id, format_price(entry_price), entry_time, 
-                    quoted_entry_price, slippage_ticks)
+                    quoted_entry_price, slippage_ticks, user_id)
                 
                 # Update setup status
                 await conn.execute("""
@@ -498,13 +541,14 @@ class TradingDB:
                 
                 return trade_id
     
-    def validate_price_movement(self, base_price: float, new_price: float, max_percent_move: float = 10.0) -> bool:
+    def validate_price_movement(self, base_price: float, new_price: float, symbol: str = 'NQ', max_percent_move: float = 10.0) -> bool:
         """
         Validate if a price movement is within reasonable bounds
         
         Args:
             base_price: Reference price (like entry price or last known good price)
             new_price: New price to validate
+            symbol: Symbol to check price range for (NQ, ES, etc.)
             max_percent_move: Maximum allowed percentage move (default 10%)
             
         Returns:
@@ -517,6 +561,17 @@ class TradingDB:
             
             if base <= 0 or new <= 0:
                 return False
+            
+            # Validate price is within symbol's expected range
+            symbol_key = symbol.split('.')[0] if '.' in symbol else symbol  # Handle NQ.FUT -> NQ
+            if symbol_key in SYMBOL_CONFIG:
+                config = SYMBOL_CONFIG[symbol_key]
+                min_price = config['price_range']['min']
+                max_price = config['price_range']['max']
+                
+                if not (min_price <= new <= max_price):
+                    self.logger.warning(f"Price {new:.2f} for {symbol} outside expected range {min_price}-{max_price}")
+                    return False
             
             # Calculate percentage change
             percent_change = abs((new - base) / base * 100)
@@ -551,10 +606,10 @@ class TradingDB:
         
         async with self.pool.acquire() as conn:
             async with conn.transaction():
-                # Get trade and setup details
+                # Get trade and setup details including user_id
                 trade_data = await conn.fetchrow("""
                     SELECT t.*, ts.take_profit, ts.stop_loss, ts.direction,
-                           ts.entry_zone_low, ts.entry_zone_high, t.entry_time
+                           ts.entry_zone_low, ts.entry_zone_high, t.entry_time, ts.user_id
                     FROM trades t
                     JOIN trade_setups ts ON t.setup_id = ts.id
                     WHERE t.id = $1
@@ -563,6 +618,12 @@ class TradingDB:
                 if not trade_data:
                     self.logger.error(f"No trade found with ID {trade_id}")
                     return
+                
+                # Get user_id from setup record (since livedataservice has no user context)
+                user_id = trade_data['user_id']
+                if user_id:
+                    await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+                    self.logger.info(f"Set tenant context for user {user_id} in record_trade_exit (from setup)")
                 
                 # Convert all numeric values to Decimal for consistent calculation
                 entry_price = Decimal(str(trade_data['entry_price']))
@@ -582,12 +643,17 @@ class TradingDB:
                 min_price = min(entry_zone_low, take_profit, stop_loss)
                 avg_price = (max_price + min_price) / 2
                 
-                # Validate exit price is within reasonable range
-                if not self.validate_price_movement(float(avg_price), float(new_exit_price)):
+                # Get symbol from setup for price validation
+                setup_symbol = await conn.fetchval("SELECT symbol FROM trade_setups WHERE id = $1", trade_data['setup_id'])
+                # Extract base symbol for validation
+                base_symbol = setup_symbol.split('.')[0] if '.' in setup_symbol else setup_symbol
+                
+                # Validate exit price is within reasonable range for the specific symbol
+                if not self.validate_price_movement(float(avg_price), float(new_exit_price), base_symbol):
                     error_msg = (
-                        f"Invalid exit price {new_exit_price} for trade {trade_id}.\n"
+                        f"Invalid exit price {new_exit_price} for {base_symbol} trade {trade_id}.\n"
                         f"Entry: {entry_price}, TP: {take_profit}, SL: {stop_loss}\n"
-                        f"Price appears to be outside reasonable range."
+                        f"Price appears to be outside reasonable range for {base_symbol}."
                     )
                     self.logger.error(error_msg)
                     raise ValueError(error_msg)
@@ -1058,15 +1124,21 @@ class TradingDB:
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 try:
-                    # Get setup details for validation
+                    # Get setup details for validation and user_id
                     setup = await conn.fetchrow("""
-                        SELECT status, take_profit, stop_loss
+                        SELECT status, take_profit, stop_loss, user_id
                         FROM trade_setups
                         WHERE id = $1
                     """, setup_id)
                     
                     if not setup:
                         raise ValueError(f"No setup found with ID {setup_id}")
+                    
+                    # Get user_id from setup record (since livedataservice has no user context)
+                    user_id = setup['user_id']
+                    if user_id:
+                        await conn.execute(f"SELECT set_config('app.current_user', '{user_id}', TRUE)")
+                        self.logger.info(f"Set tenant context for user {user_id} in record_trade_from_setup (from setup)")
                     
                     if setup['status'] != 'open':
                         raise ValueError(f"Setup {setup_id} is not open (status: {setup['status']})")
@@ -1096,16 +1168,19 @@ class TradingDB:
                             entry_price,
                             entry_time,
                             created_at,
-                            updated_at
+                            updated_at,
+                            user_id
                         ) VALUES (
                             $1, $2, $3,
                             CURRENT_TIMESTAMP,
-                            CURRENT_TIMESTAMP
+                            CURRENT_TIMESTAMP,
+                            $4
                         ) RETURNING id
                     """,
                         setup_id,
                         formatted_price,
-                        get_utc_now()
+                        get_utc_now(),
+                        user_id
                     )
                     
                     # Format prices for logging
@@ -2049,3 +2124,61 @@ class TradingDB:
             self.logger.error(f"Error in trade outcome audit: {e}", exc_info=True)
             
         return results
+
+    async def get_trade_setups_by_user(self, user_id: str, limit: int = 50) -> List[Dict]:
+        """Get trade setups for a specific user with proper tenant context
+        
+        Args:
+            user_id: User ID to get trade setups for
+            limit: Maximum number of records to return
+            
+        Returns:
+            List of trade setup dictionaries
+        """
+        await self.ensure_connected()
+        
+        try:
+            # Convert string to UUID if needed
+            user_uuid = user_id if isinstance(user_id, str) else str(user_id)
+            
+            async with self.pool.acquire() as conn:
+                # Set tenant context for this query
+                await conn.execute(f"SELECT set_config('app.current_user', '{user_uuid}', TRUE)")
+                
+                # Query trade setups for the user
+                rows = await conn.fetch("""
+                    SELECT 
+                        id,
+                        symbol,
+                        status,
+                        entry_zone_low,
+                        entry_zone_high,
+                        take_profit,
+                        stop_loss,
+                        direction,
+                        setup_time,
+                        created_at,
+                        updated_at,
+                        characteristics,
+                        user_id
+                    FROM trade_setups
+                    WHERE user_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2
+                """, user_uuid, limit)
+                
+                # Convert to dictionaries
+                setups = []
+                for row in rows:
+                    setup = dict(row)
+                    # Convert UUID to string for JSON serialization
+                    setup['id'] = str(setup['id'])
+                    setup['user_id'] = str(setup['user_id'])
+                    setups.append(setup)
+                
+                self.logger.info(f"Retrieved {len(setups)} trade setups for user: {user_id}")
+                return setups
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get trade setups for user {user_id}: {str(e)}")
+            raise
