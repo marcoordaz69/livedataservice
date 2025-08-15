@@ -14,7 +14,8 @@ import time
 try:
     from price_capture.setup_monitor import SetupMonitor
     from database.trading_db import TradingDB
-    SETUP_MONITOR_AVAILABLE = True
+    # Temporarily disable setup monitor due to performance issues
+    SETUP_MONITOR_AVAILABLE = False  # Changed from True to avoid DB bottleneck
 except ImportError:
     # Fallback if modules not available in Railway
     SETUP_MONITOR_AVAILABLE = False
