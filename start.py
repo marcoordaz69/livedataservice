@@ -49,7 +49,7 @@ def check_environment():
     logger.info("✅ All required environment variables are set")
     return True
 
-async def run_with_health_check(main_coro):
+async def run_with_health_check(main_func):
     """Run main coroutine alongside health check server"""
     from health_check import run_health_server
     
@@ -62,7 +62,7 @@ async def run_with_health_check(main_coro):
     
     try:
         # Run main launcher
-        await main_coro()
+        await main_func()
     except Exception as e:
         logger.error(f"Main launcher failed: {e}")
         # Keep health server running even if main fails
@@ -112,7 +112,7 @@ if __name__ == "__main__":
             # Modify sys.argv to add --live-only and --enable-level1 flags
             sys.argv.extend(['--live-only', '--enable-level1'])
         
-        asyncio.run(run_with_health_check(main()))
+        asyncio.run(run_with_health_check(main))
     except KeyboardInterrupt:
         logger.info("Launcher terminated by user")
     except Exception as e:
