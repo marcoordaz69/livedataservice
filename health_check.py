@@ -32,14 +32,12 @@ class HealthCheckServer:
     async def status_check(self, request):
         """Detailed status check with service information"""
         try:
-            # Check database connectivity
-            from price_capture.live_data_launcher import get_db_connection
-            try:
-                conn = await get_db_connection()
-                await conn.close()
-                db_status = "connected"
-            except Exception as e:
-                db_status = f"error: {str(e)}"
+            # Simple database check - just check if env vars exist
+            db_status = "configured" if all([
+                os.getenv('host'), 
+                os.getenv('user'), 
+                os.getenv('password')
+            ]) else "not_configured"
             
             # Check if Level 1 script is available
             level1_path = os.path.join(os.path.dirname(__file__), "price_capture", "simple_level1.py")

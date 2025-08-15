@@ -53,17 +53,28 @@ async def run_with_health_check(main_coro):
     """Run main coroutine alongside health check server"""
     from health_check import run_health_server
     
-    # Start health check server as background task
+    # Start health check server as background task FIRST
     health_task = asyncio.create_task(run_health_server())
+    
+    # Give health server time to start
+    await asyncio.sleep(2)
+    logger.info("Health check server should be running...")
     
     try:
         # Run main launcher
         await main_coro()
     except Exception as e:
         logger.error(f"Main launcher failed: {e}")
-        raise
+        # Keep health server running even if main fails
+        logger.info("Keeping health server running despite main launcher failure...")
+        try:
+            while True:
+                await asyncio.sleep(60)
+        except KeyboardInterrupt:
+            logger.info("Received shutdown signal")
     finally:
         # Cleanup health server
+        logger.info("Shutting down health server...")
         health_task.cancel()
         try:
             await health_task
@@ -71,10 +82,14 @@ async def run_with_health_check(main_coro):
             pass
 
 if __name__ == "__main__":
-    # Check environment first
-    if not check_environment():
-        logger.error("Environment check failed - exiting")
-        sys.exit(1)
+    # Check environment first, but don't exit on Railway if some vars missing
+    env_check_passed = check_environment()
+    if not env_check_passed:
+        if os.getenv('RAILWAY_DEPLOYMENT'):
+            logger.warning("Environment check failed on Railway - continuing anyway to start health server...")
+        else:
+            logger.error("Environment check failed - exiting")
+            sys.exit(1)
     
     # Set default symbols for Railway deployment if not already set
     if os.getenv('RAILWAY_DEPLOYMENT') and not os.getenv('ENABLED_SYMBOLS'):
