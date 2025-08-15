@@ -255,23 +255,26 @@ def process_record(record):
         volume = getattr(record, 'volume', 0)
         raw_symbol = getattr(record, 'symbol', 'NQ.n.0')
         
-        # Determine normalized symbol from Databento symbol info, not price
+        # Determine normalized symbol using instrument_id FIRST (most reliable)
         normalized_symbol = 'NQ'  # Default
-        if hasattr(record, 'symbol') and record.symbol:
-            symbol_str = str(record.symbol)
-            if 'ES' in symbol_str.upper():
-                normalized_symbol = 'ES'
-            elif 'NQ' in symbol_str.upper():
-                normalized_symbol = 'NQ'
+        instrument_id = getattr(record, 'instrument_id', 0) if hasattr(record, 'instrument_id') else 0
         
-        # Alternative: check instrument_id mapping if available
-        if hasattr(record, 'instrument_id'):
-            # ES typically has lower instrument IDs than NQ
-            instrument_id = getattr(record, 'instrument_id', 0)
-            if instrument_id == 14160:  # ES instrument from logs
-                normalized_symbol = 'ES'
-            elif instrument_id == 42008487:  # NQ instrument from logs  
-                normalized_symbol = 'NQ'
+        if instrument_id == 14160:  # ES instrument from logs
+            normalized_symbol = 'ES'
+        elif instrument_id == 42008487:  # NQ instrument from logs  
+            normalized_symbol = 'NQ'
+        else:
+            # Fallback: try symbol string detection
+            if hasattr(record, 'symbol') and record.symbol:
+                symbol_str = str(record.symbol)
+                if 'ES' in symbol_str.upper():
+                    normalized_symbol = 'ES'
+                elif 'NQ' in symbol_str.upper():
+                    normalized_symbol = 'NQ'
+            
+            # Log unmapped instrument IDs for debugging
+            if instrument_id != 0:
+                logger.info(f"Unmapped instrument_id {instrument_id} defaulting to {normalized_symbol} (avg_price: {sum([open_price, high_price, low_price, close_price]) / 4:.2f})")
         
         # Validate the price for the determined symbol (use working ranges from live_data_service.py)
         avg_price = sum([open_price, high_price, low_price, close_price]) / 4
