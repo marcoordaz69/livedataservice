@@ -10,9 +10,16 @@ from dotenv import load_dotenv
 from decimal import Decimal
 import time
 
-# Import SetupMonitor and TradingDB
-from setup_monitor import SetupMonitor
-from database.db_factory import get_db
+# Import SetupMonitor and TradingDB - restored from working version
+try:
+    from price_capture.setup_monitor import SetupMonitor
+    from database.trading_db import TradingDB
+    SETUP_MONITOR_AVAILABLE = True
+except ImportError:
+    # Fallback if modules not available in Railway
+    SETUP_MONITOR_AVAILABLE = False
+    SetupMonitor = None
+    TradingDB = None
 
 # Symbol configuration - using continuous contracts to match live_data_service.py
 SYMBOL_CONFIG = {
@@ -52,8 +59,7 @@ load_dotenv()
 # Global variables
 minute_data_cache = {}
 
-# Setup monitor instance (global)
-setup_monitor = None
+setup_monitor = None  # Disabled for Railway stability
 
 # Remove global db_lock, rely on connection pool instead
 # db_lock = asyncio.Lock()
@@ -667,31 +673,43 @@ async def main():
         await create_db_pool()
         logger.info("Database connection pool established")
         
-        # Initialize database connection
-        logger.info("Initializing database connection...")
-        db_conn = get_db()
-        await db_conn.ensure_connected()
-        logger.info("Database connection established")
-        
-        # Initialize setup monitor
-        logger.info("Initializing setup monitor...")
-        setup_monitor = SetupMonitor(db_conn)
-        logger.info("Setup monitor initialized")
+        # Initialize setup monitor if available
+        if SETUP_MONITOR_AVAILABLE:
+            try:
+                logger.info("Initializing database connection for setup monitor...")
+                db_conn = TradingDB()
+                await db_conn.ensure_connected()
+                logger.info("Database connection established")
+                
+                logger.info("Initializing setup monitor...")
+                setup_monitor = SetupMonitor(db_conn)
+                logger.info("Setup monitor initialized")
+            except Exception as e:
+                logger.warning(f"Setup monitor initialization failed: {e}")
+                logger.info("Continuing without setup monitor...")
+                setup_monitor = None
+        else:
+            logger.info("Setup monitor not available - continuing without it")
+            setup_monitor = None
         
         # Get enabled symbols for initial setup loading
         enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ,ES').split(',')
         enabled_symbols = [s.strip() for s in enabled_symbols]
         
-        # Load setups for all enabled symbols
-        for symbol in enabled_symbols:
-            if symbol in SYMBOL_CONFIG:
-                setup_symbol = f'{symbol}.FUT'
-                await setup_monitor.refresh_setups(setup_symbol)
-                setup_count = setup_monitor.get_active_setup_count(setup_symbol)
-                
-                # Get detailed counts of open and active setups
-                open_count, active_count = await get_setup_status_counts(setup_monitor, setup_symbol)
-                logger.info(f"Loaded {setup_count} trade setups for {setup_symbol} (Open: {open_count}, Active: {active_count})")
+        # Load setups for all enabled symbols if setup monitor is available
+        if setup_monitor:
+            for symbol in enabled_symbols:
+                if symbol in SYMBOL_CONFIG:
+                    try:
+                        setup_symbol = f'{symbol}.FUT'
+                        await setup_monitor.refresh_setups(setup_symbol)
+                        setup_count = setup_monitor.get_active_setup_count(setup_symbol)
+                        
+                        # Get detailed counts of open and active setups
+                        open_count, active_count = await get_setup_status_counts(setup_monitor, setup_symbol)
+                        logger.info(f"Loaded {setup_count} trade setups for {setup_symbol} (Open: {open_count}, Active: {active_count})")
+                    except Exception as e:
+                        logger.warning(f"Failed to load setups for {setup_symbol}: {e}")
         
         logger.info("Initializing Databento client...")
         client = db.Live(key=os.getenv("DATABENTO_API_KEY"))
@@ -764,24 +782,25 @@ async def main():
                     
                     # Refresh setup monitor periodically 
                     if count % 12 == 0:  # Every 60 seconds
-                        try:
-                            # Remove db_lock and directly refresh setups
-                            logger.info("Refreshing trade setups...")
-                            # Ensure DB connection is valid
-                            await setup_monitor.db.ensure_connected()
-                            
-                            # Refresh setups for all enabled symbols
-                            for symbol in enabled_symbols:
-                                if symbol in SYMBOL_CONFIG:
-                                    setup_symbol = f'{symbol}.FUT'
-                                    await setup_monitor.refresh_setups(setup_symbol)
-                                    setup_count = setup_monitor.get_active_setup_count(setup_symbol)
-                                    
-                                    # Get detailed counts of open and active setups
-                                    open_count, active_count = await get_setup_status_counts(setup_monitor, setup_symbol)
-                                    logger.info(f"Now tracking {setup_count} setups for {setup_symbol} (Open: {open_count}, Active: {active_count})")
-                        except Exception as refresh_error:
-                            logger.error(f"Error refreshing setups: {refresh_error}")
+                        if setup_monitor:
+                            try:
+                                # Remove db_lock and directly refresh setups
+                                logger.info("Refreshing trade setups...")
+                                # Ensure DB connection is valid
+                                await setup_monitor.db.ensure_connected()
+                                
+                                # Refresh setups for all enabled symbols
+                                for symbol in enabled_symbols:
+                                    if symbol in SYMBOL_CONFIG:
+                                        setup_symbol = f'{symbol}.FUT'
+                                        await setup_monitor.refresh_setups(setup_symbol)
+                                        setup_count = setup_monitor.get_active_setup_count(setup_symbol)
+                                        
+                                        # Get detailed counts of open and active setups
+                                        open_count, active_count = await get_setup_status_counts(setup_monitor, setup_symbol)
+                                        logger.info(f"Now tracking {setup_count} setups for {setup_symbol} (Open: {open_count}, Active: {active_count})")
+                            except Exception as refresh_error:
+                                logger.error(f"Error refreshing setups: {refresh_error}")
                     
                     # If no updates for a long time, try to reconnect
                     if (current_time - last_update).seconds > 300:  # 5 minutes
