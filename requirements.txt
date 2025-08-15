@@ -17,6 +17,9 @@ colorama>=0.4.6
 # Health Check Server
 aiohttp>=3.8.0
 
+# Market Hours Support
+pytz>=2023.3
+
 # Data Processing (minimal)
 # decimal  # Built-in Python module - no installation needed
 

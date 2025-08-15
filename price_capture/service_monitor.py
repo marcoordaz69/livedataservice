@@ -190,9 +190,41 @@ class ServiceMonitor:
             
     async def check_and_restart_services(self):
         """Check services health and restart if needed."""
+        # Import market hours helper
+        try:
+            from market_hours_helper import is_market_open, get_next_market_open
+            market_hours_available = True
+        except ImportError:
+            logger.warning("Market hours helper not available, assuming market is always open")
+            market_hours_available = False
+            is_market_open = lambda: True
+            
         while self.running:
             try:
                 await asyncio.sleep(self.check_interval)
+                
+                # Check if market is open (skip restart logic if closed)
+                market_open = is_market_open() if market_hours_available else True
+                
+                if not market_open:
+                    # Market is closed, don't restart for stale data
+                    if int(time.time()) % 300 < self.check_interval:
+                        logger.info("Market is closed - services on standby")
+                    # Still check if processes are alive
+                    for service_name in list(self.services.keys()):
+                        process = self.services[service_name]
+                        if process.poll() is not None:
+                            logger.warning(f"{service_name} process died during market close")
+                            # Restart even during market close to be ready
+                            if self.restart_counts.get(service_name, 0) < self.max_restarts:
+                                await asyncio.sleep(2)
+                                if service_name == 'level1':
+                                    script_path = os.path.join(PRICE_CAPTURE_DIR, "simple_level1.py")
+                                else:
+                                    script_path = os.path.join(PRICE_CAPTURE_DIR, "simple_ohlcv.py")
+                                self.start_service(service_name, script_path)
+                                asyncio.create_task(self.monitor_service_output(service_name))
+                    continue
                 
                 # Check Level 1 service
                 level1_status = await self.check_recent_data('raw_level1', 'NQ')
