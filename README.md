@@ -5,8 +5,9 @@ This is the standalone live data service that captures real-time market data and
 ## 🎯 What This Service Does
 
 - **Live Market Data**: Captures real-time NQ futures data from Databento
+- **Level 1 Data**: Real-time top of book (bid/ask) streaming for enhanced precision
 - **Trade Validation**: Monitors trade setups and triggers entries/exits
-- **Database Updates**: Stores OHLCV data and trade events in Supabase
+- **Database Updates**: Stores OHLCV, Level 1, and trade events in Supabase
 - **24/7 Operation**: Designed to run continuously in the cloud
 
 ## 📦 Package Contents
@@ -15,7 +16,8 @@ This is the standalone live data service that captures real-time market data and
 trading-data-service/
 ├── price_capture/               # Live data components
 │   ├── live_data_launcher.py   # Main orchestrator
-│   ├── simple_ohlcv.py         # Live data streaming
+│   ├── simple_ohlcv.py         # Live OHLCV data streaming
+│   ├── simple_level1.py        # Level 1 (bid/ask) data streaming
 │   ├── setup_monitor.py        # Trade validation logic
 │   ├── live_data_service.py    # Historical backfill
 │   └── monitor_setup_validator.py  # Real-time monitoring
@@ -127,7 +129,13 @@ Common issues:
 # Full service (backfill + live data + monitoring)
 python price_capture/live_data_launcher.py
 
-# Live data only
+# Live data only (OHLCV + Level 1 + monitoring)
+python price_capture/live_data_launcher.py --live-only --enable-level1
+
+# Level 1 data only (bid/ask streaming)
+python price_capture/live_data_launcher.py --level1-only
+
+# Live OHLCV only (no Level 1)
 python price_capture/live_data_launcher.py --live-only
 
 # Backfill only

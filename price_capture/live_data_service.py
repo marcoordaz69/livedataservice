@@ -29,6 +29,22 @@ api_key = os.getenv('DATABENTO_API_KEY')
 if not api_key:
     raise ValueError("DATABENTO_API_KEY not found in environment variables")
 
+# Symbol configuration - using continuous contracts to avoid rollover issues
+SYMBOL_CONFIG = {
+    'NQ': {
+        'databento_symbol': 'NQ.c.0',  # Continuous contract (front month)
+        'db_symbol': 'NQ',
+        'price_range': {'min': 10000, 'max': 50000},
+        'description': 'NASDAQ 100 E-mini (Continuous)'
+    },
+    'ES': {
+        'databento_symbol': 'ES.c.0',  # Continuous contract (front month)
+        'db_symbol': 'ES',
+        'price_range': {'min': 2000, 'max': 10000},
+        'description': 'S&P 500 E-mini (Continuous)'
+    }
+}
+
 # Control flags
 running = True
 reconnect_requested = False
@@ -39,6 +55,22 @@ def format_price(price):
     if isinstance(price, (int, float)):
         return price / 1000000000
     return price
+
+def validate_price_range(symbol, price):
+    """Validate if a price is within the expected range for a symbol."""
+    if symbol not in SYMBOL_CONFIG:
+        logger.warning(f"Unknown symbol {symbol}, allowing price {price}")
+        return True
+    
+    config = SYMBOL_CONFIG[symbol]
+    min_price = config['price_range']['min']
+    max_price = config['price_range']['max']
+    
+    if min_price <= price <= max_price:
+        return True
+    else:
+        logger.warning(f"Price {price:.2f} for {symbol} outside expected range {min_price}-{max_price}")
+        return False
 
 # Database connection settings
 async def get_db_connection():
@@ -256,6 +288,23 @@ async def historical_load(start_timestamp=None):
         # Calculate cutoff for Live API (24 hours ago)
         live_api_cutoff = end_time - timedelta(hours=24)
         
+        # Get enabled symbols for historical load
+        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ,ES').split(',')
+        enabled_symbols = [s.strip() for s in enabled_symbols]
+        
+        # Build list of databento symbols to fetch historical data for
+        databento_symbols = []
+        for symbol in enabled_symbols:
+            if symbol in SYMBOL_CONFIG:
+                databento_symbols.append(SYMBOL_CONFIG[symbol]['databento_symbol'])
+                logger.info(f"Added {symbol} -> {SYMBOL_CONFIG[symbol]['databento_symbol']} for historical load")
+            else:
+                logger.warning(f"Unknown symbol {symbol}, skipping in historical load")
+        
+        if not databento_symbols:
+            logger.error("No valid symbols for historical load")
+            return []
+        
         if start_timestamp:
             # Convert UNIX timestamp to datetime
             start_time = datetime.fromtimestamp(start_timestamp, tz=timezone.utc)
@@ -287,7 +336,7 @@ async def historical_load(start_timestamp=None):
                     dataset="GLBX.MDP3",
                     schema="ohlcv-1m",
                     stype_in="continuous",  # Use continuous symbology like live streaming
-                    symbols=["NQ.n.0"],     # Use smart symbology for front month contract
+                    symbols=databento_symbols,     # Use configured symbols for front month contracts
                     start=historical_start_ts,
                     end=historical_end_ts
                 )
@@ -317,43 +366,62 @@ async def historical_load(start_timestamp=None):
                                   format_price(getattr(record, 'low', 0)),
                                   format_price(getattr(record, 'close', 0)))
                         
-                        # Validate NQ price range (should be around 18000-25000)
+                        # Determine normalized symbol from price range and contract
                         avg_price = sum(prices) / len(prices)
-                        if avg_price < 10000 or avg_price > 50000:
-                            logger.warning(f"Skipping record with invalid NQ price: {avg_price:.2f} at {timestamp.isoformat()}")
+                        normalized_symbol = 'NQ'  # Default
+                        
+                        # Try to determine symbol from price range
+                        for sym_key, config in SYMBOL_CONFIG.items():
+                            if validate_price_range(sym_key, avg_price):
+                                normalized_symbol = config['db_symbol']
+                                break
+                        
+                        # Double-check with contract name if available
+                        if symbol != 'Unknown':
+                            if 'ES' in symbol.upper():
+                                normalized_symbol = 'ES'
+                            elif 'NQ' in symbol.upper():
+                                normalized_symbol = 'NQ'
+                        
+                        # Validate the determined symbol
+                        if not validate_price_range(normalized_symbol, avg_price):
+                            logger.warning(f"Skipping record with invalid {normalized_symbol} price: {avg_price:.2f} at {timestamp.isoformat()}")
                             continue
                         
                         # Add to contract tracker
                         contract_tracker.add_record(instrument_id, symbol, timestamp, prices, volume)
                         
-                        # Track the entry for this timestamp
-                        if minute_key not in highest_volume_entries:
-                            highest_volume_entries[minute_key] = {
+                        # Create a unique key per symbol per minute
+                        symbol_minute_key = f"{normalized_symbol}_{minute_key}"
+                        
+                        # Track the entry for this timestamp and symbol
+                        if symbol_minute_key not in highest_volume_entries:
+                            highest_volume_entries[symbol_minute_key] = {
                                 'timestamp': timestamp,
-                                'symbol': 'NQ',  # Always use NQ as the symbol for consistency
+                                'symbol': normalized_symbol,
                                 'instrument_id': instrument_id,
                                 'open': prices[0],
                                 'high': prices[1],
                                 'low': prices[2],
                                 'close': prices[3],
                                 'volume': volume,
-                                'source_contract': symbol if symbol != 'Unknown' else 'NQ.n.0'
+                                'source_contract': symbol if symbol != 'Unknown' else f'{normalized_symbol}.c.0'
                             }
                         else:
-                            existing = highest_volume_entries[minute_key]
+                            existing = highest_volume_entries[symbol_minute_key]
                             
                             # Update if this is the primary contract or has higher volume
                             if contract_tracker.is_primary_contract(instrument_id) or volume > existing['volume']:
-                                highest_volume_entries[minute_key] = {
+                                highest_volume_entries[symbol_minute_key] = {
                                     'timestamp': timestamp,
-                                    'symbol': 'NQ',  # Always use NQ as the symbol for consistency
+                                    'symbol': normalized_symbol,
                                     'instrument_id': instrument_id,
                                     'open': prices[0],
                                     'high': prices[1],
                                     'low': prices[2],
                                     'close': prices[3],
                                     'volume': volume,
-                                    'source_contract': symbol if symbol != 'Unknown' else 'NQ.n.0'
+                                    'source_contract': symbol if symbol != 'Unknown' else f'{normalized_symbol}.c.0'
                                 }
                     
                     # Process symbol mappings
@@ -380,12 +448,12 @@ async def historical_load(start_timestamp=None):
         # Convert to nanoseconds for Databento API
         live_start_ts = int(live_start_time.timestamp() * 1e9)
         
-        logger.info(f"Subscribing to NQ.n.0 OHLCV data starting from {live_start_time.isoformat()} (UTC)...")
+        logger.info(f"Subscribing to {databento_symbols} OHLCV data starting from {live_start_time.isoformat()} (UTC)...")
         live_client.subscribe(
             dataset="GLBX.MDP3",
             schema="ohlcv-1m",
             stype_in="continuous",  # Use continuous symbology like live streaming
-            symbols=["NQ.n.0"],     # Use smart symbology for front month contract
+            symbols=databento_symbols,     # Use configured symbols for front month contracts
             start=live_start_ts
         )
         
@@ -420,44 +488,63 @@ async def historical_load(start_timestamp=None):
                           format_price(getattr(record, 'low', 0)),
                           format_price(getattr(record, 'close', 0)))
                 
-                # Validate NQ price range (should be around 18000-25000)
+                # Determine normalized symbol from price range and contract
                 avg_price = sum(prices) / len(prices)
-                if avg_price < 10000 or avg_price > 50000:
-                    logger.warning(f"Skipping record with invalid NQ price: {avg_price:.2f} at {timestamp.isoformat()}")
+                normalized_symbol = 'NQ'  # Default
+                
+                # Try to determine symbol from price range
+                for sym_key, config in SYMBOL_CONFIG.items():
+                    if validate_price_range(sym_key, avg_price):
+                        normalized_symbol = config['db_symbol']
+                        break
+                
+                # Double-check with contract name if available
+                if symbol != 'Unknown':
+                    if 'ES' in symbol.upper():
+                        normalized_symbol = 'ES'
+                    elif 'NQ' in symbol.upper():
+                        normalized_symbol = 'NQ'
+                
+                # Validate the determined symbol
+                if not validate_price_range(normalized_symbol, avg_price):
+                    logger.warning(f"Skipping record with invalid {normalized_symbol} price: {avg_price:.2f} at {timestamp.isoformat()}")
                     continue
                 
                 # Add to contract tracker
                 contract_tracker.add_record(instrument_id, symbol, timestamp, prices, volume)
                 
-                # Track the entry for this timestamp
-                if minute_key not in highest_volume_entries:
-                    highest_volume_entries[minute_key] = {
+                # Create a unique key per symbol per minute
+                symbol_minute_key = f"{normalized_symbol}_{minute_key}"
+                
+                # Track the entry for this timestamp and symbol
+                if symbol_minute_key not in highest_volume_entries:
+                    highest_volume_entries[symbol_minute_key] = {
                         'timestamp': timestamp,
-                        'symbol': 'NQ',  # Always use NQ as the symbol for consistency
+                        'symbol': normalized_symbol,
                         'instrument_id': instrument_id,
                         'open': prices[0],
                         'high': prices[1],
                         'low': prices[2],
                         'close': prices[3],
                         'volume': volume,
-                        'source_contract': symbol if symbol != 'Unknown' else 'NQ.n.0'
+                        'source_contract': symbol if symbol != 'Unknown' else f'{normalized_symbol}.c.0'
                     }
                 else:
-                    existing = highest_volume_entries[minute_key]
+                    existing = highest_volume_entries[symbol_minute_key]
                     
                     # Update if this is the primary contract or has higher volume and is price-consistent
                     if (contract_tracker.is_primary_contract(instrument_id) or 
                         (volume > existing['volume'] * 1.2)):  # Must be 20% higher volume
-                        highest_volume_entries[minute_key] = {
+                        highest_volume_entries[symbol_minute_key] = {
                             'timestamp': timestamp,
-                            'symbol': symbol_key,  # Use the validated symbol
+                            'symbol': normalized_symbol,  # Use the validated symbol
                             'instrument_id': instrument_id,
                             'open': prices[0],
                             'high': prices[1],
                             'low': prices[2],
                             'close': prices[3],
                             'volume': volume,
-                            'source_contract': symbol if symbol != 'Unknown' else f'{symbol_key}.n.0'
+                            'source_contract': symbol if symbol != 'Unknown' else f'{normalized_symbol}.c.0'
                         }
                 
                 # Log progress periodically
@@ -527,8 +614,8 @@ async def live_data_stream(start_time: datetime):
         
         logger.info(f"=== STARTING LIVE DATA STREAM FROM {start_time.isoformat()} (UTC) ===")
         
-        # Get enabled symbols from environment or default to NQ
-        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ').split(',')
+        # Get enabled symbols from environment or default to NQ,ES
+        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ,ES').split(',')
         enabled_symbols = [s.strip() for s in enabled_symbols]
         logger.info(f"Subscribing to OHLCV-1m data for symbols: {enabled_symbols}")
         

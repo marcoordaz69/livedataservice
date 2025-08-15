@@ -40,10 +40,20 @@ class HealthCheckServer:
                 db_status = "connected"
             except Exception as e:
                 db_status = f"error: {str(e)}"
+            
+            # Check if Level 1 script is available
+            level1_path = os.path.join(os.path.dirname(__file__), "price_capture", "simple_level1.py")
+            level1_available = os.path.exists(level1_path)
                 
             return web.json_response({
                 "status": "running",
                 "database": db_status,
+                "level1_script": "available" if level1_available else "missing",
+                "services": {
+                    "ohlcv": "enabled",
+                    "level1": "enabled" if level1_available else "disabled",
+                    "monitor": "enabled"
+                },
                 "environment": "railway" if os.getenv('RAILWAY_DEPLOYMENT') else "local",
                 "uptime_seconds": (datetime.utcnow() - self.start_time).total_seconds(),
                 "timestamp": datetime.utcnow().isoformat()

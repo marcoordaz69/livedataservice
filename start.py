@@ -76,6 +76,11 @@ if __name__ == "__main__":
         logger.error("Environment check failed - exiting")
         sys.exit(1)
     
+    # Set default symbols for Railway deployment if not already set
+    if os.getenv('RAILWAY_DEPLOYMENT') and not os.getenv('ENABLED_SYMBOLS'):
+        os.environ['ENABLED_SYMBOLS'] = 'NQ,ES'
+        logger.info("🎯 Railway deployment: Enabled symbols NQ,ES")
+    
     # Set explicit event loop policy for consistent behavior
     if sys.platform == 'win32':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -86,11 +91,11 @@ if __name__ == "__main__":
         # Import and run the main launcher
         from price_capture.live_data_launcher import main
         
-        # For Railway, check if we should run in live-only mode
+        # For Railway, check if we should run in live-only mode with Level 1
         if os.getenv('RAILWAY_DEPLOYMENT'):
-            logger.info("🚂 Railway deployment detected - running in live-only mode")
-            # Modify sys.argv to add --live-only flag
-            sys.argv.extend(['--live-only'])
+            logger.info("🚂 Railway deployment detected - running in live-only mode with Level 1 data")
+            # Modify sys.argv to add --live-only and --enable-level1 flags
+            sys.argv.extend(['--live-only', '--enable-level1'])
         
         asyncio.run(run_with_health_check(main()))
     except KeyboardInterrupt:

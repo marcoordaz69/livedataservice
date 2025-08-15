@@ -247,6 +247,136 @@ async def run_live_stream():
         logger.error(f"Error starting live stream: {e}")
         return None
 
+async def run_level1_stream():
+    """Run the Level 1 data streaming process using simple_level1.py."""
+    logger.info("Starting Level 1 data streaming process...")
+    
+    try:
+        # Get the path to simple_level1.py in the price_capture directory
+        level1_service_path = os.path.join(PRICE_CAPTURE_DIR, "simple_level1.py")
+        
+        # Check if the script exists
+        if not os.path.exists(level1_service_path):
+            logger.error(f"simple_level1.py not found at {level1_service_path}!")
+            return None
+            
+        # Make simple_level1.py executable if it's not
+        if not os.access(level1_service_path, os.X_OK):
+            logger.info("Making simple_level1.py executable...")
+            os.chmod(level1_service_path, 0o755)
+        
+        # Set up environment for Level 1 process
+        env = os.environ.copy()
+        
+        # Set PYTHONPATH to ensure modules can be found
+        parent_dir = os.path.dirname(os.getcwd())
+        if "PYTHONPATH" in env:
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
+        else:
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
+        
+        # Set asyncio debug mode
+        env["PYTHONASYNCIODEBUG"] = "1"
+        env["PYTHONASYNCIOMETHODNAME"] = "loop"
+        
+        # Start Level 1 process
+        process = subprocess.Popen(
+            [sys.executable, "-u", level1_service_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            env=env
+        )
+        
+        # Start a task to monitor the process output
+        async def monitor_output():
+            while True:
+                try:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        logger.info(f"[Level1] {output.strip()}")
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    logger.error(f"Error monitoring Level 1 output: {e}")
+                    await asyncio.sleep(1)
+        
+        # Create the task to monitor output
+        monitor_task = asyncio.create_task(monitor_output())
+        logger.info("Level 1 data streaming process started")
+        
+        return process
+        
+    except Exception as e:
+        logger.error(f"Error starting Level 1 stream: {e}")
+        return None
+
+async def run_mbo_stream():
+    """Run the MBO data streaming process using mbo_data_service.py."""
+    logger.info("Starting MBO data streaming process...")
+    
+    try:
+        # Get the path to mbo_data_service.py in the price_capture directory
+        mbo_service_path = os.path.join(PRICE_CAPTURE_DIR, "mbo_data_service.py")
+        
+        # Check if the script exists
+        if not os.path.exists(mbo_service_path):
+            logger.error(f"mbo_data_service.py not found at {mbo_service_path}!")
+            return None
+            
+        # Make mbo_data_service.py executable if it's not
+        if not os.access(mbo_service_path, os.X_OK):
+            logger.info("Making mbo_data_service.py executable...")
+            os.chmod(mbo_service_path, 0o755)
+        
+        # Set up environment for MBO process
+        env = os.environ.copy()
+        
+        # Set PYTHONPATH to ensure modules can be found
+        parent_dir = os.path.dirname(os.getcwd())
+        if "PYTHONPATH" in env:
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
+        else:
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
+        
+        # Set asyncio debug mode
+        env["PYTHONASYNCIODEBUG"] = "1"
+        env["PYTHONASYNCIOMETHODNAME"] = "loop"
+        
+        # Start MBO process
+        process = subprocess.Popen(
+            [sys.executable, "-u", mbo_service_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            env=env
+        )
+        
+        # Start a task to monitor the process output
+        async def monitor_output():
+            while True:
+                try:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        logger.info(f"[MBO] {output.strip()}")
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    logger.error(f"Error monitoring MBO output: {e}")
+                    await asyncio.sleep(1)
+        
+        # Create the task to monitor output
+        monitor_task = asyncio.create_task(monitor_output())
+        logger.info("MBO data streaming process started")
+        
+        return process
+        
+    except Exception as e:
+        logger.error(f"Error starting MBO stream: {e}")
+        return None
+
 async def run_setup_monitor():
     """Run the setup monitoring process using monitor_setup_validator.py."""
     logger.info("Starting trade setup monitor...")
@@ -335,6 +465,67 @@ async def run_setup_monitor():
         logger.error(f"Error starting setup monitor: {e}")
         return None
 
+async def run_mbo_historical_download(symbol='NQ', days=30):
+    """Run the historical MBO data download process using historical_mbo_downloader.py."""
+    logger.info(f"Starting historical MBO download for {symbol}, {days} days...")
+    
+    try:
+        # Get the path to historical_mbo_downloader.py in the price_capture directory
+        downloader_path = os.path.join(PRICE_CAPTURE_DIR, "historical_mbo_downloader.py")
+        
+        # Check if the script exists
+        if not os.path.exists(downloader_path):
+            logger.error(f"historical_mbo_downloader.py not found at {downloader_path}!")
+            return False
+            
+        # Make historical_mbo_downloader.py executable if it's not
+        if not os.access(downloader_path, os.X_OK):
+            logger.info("Making historical_mbo_downloader.py executable...")
+            os.chmod(downloader_path, 0o755)
+        
+        # Set up environment for historical download process
+        env = os.environ.copy()
+        
+        # Set PYTHONPATH to ensure modules can be found
+        parent_dir = os.path.dirname(os.getcwd())
+        if "PYTHONPATH" in env:
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}:{env['PYTHONPATH']}"
+        else:
+            env["PYTHONPATH"] = f"{parent_dir}:{os.getcwd()}"
+        
+        # Start historical download process
+        process = subprocess.Popen(
+            [sys.executable, "-u", downloader_path, symbol, str(days)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            env=env
+        )
+        
+        logger.info(f"Historical MBO download process started (PID: {process.pid})")
+        
+        # Monitor the process and log output
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                logger.info(f"[MBO-HIST] {output.strip()}")
+        
+        # Wait for process to complete
+        return_code = process.wait()
+        
+        if return_code == 0:
+            logger.info("Historical MBO download completed successfully!")
+            return True
+        else:
+            logger.error(f"Historical MBO download failed with return code: {return_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error starting historical MBO download: {e}")
+        return False
+
 def terminate_process(process):
     """Safely terminate a process."""
     if process and process.poll() is None:
@@ -350,8 +541,14 @@ async def main():
     parser = argparse.ArgumentParser(description="Market data collection launcher")
     parser.add_argument("--backfill-only", action="store_true", help="Run only historical backfill")
     parser.add_argument("--live-only", action="store_true", help="Run only live data streaming")
-    parser.add_argument("--days", type=int, default=4, help="Number of days to backfill (default: 4)")
+    parser.add_argument("--level1-only", action="store_true", help="Run only Level 1 data streaming")
+    parser.add_argument("--mbo-only", action="store_true", help="Run only MBO data streaming")
+    parser.add_argument("--mbo-historical", action="store_true", help="Run only historical MBO download")
+    parser.add_argument("--days", type=float, default=4, help="Number of days to backfill (default: 4, supports decimals)")
+    parser.add_argument("--symbol", type=str, default="NQ", help="Symbol for MBO historical download (default: NQ)")
     parser.add_argument("--no-monitor", action="store_true", help="Disable the trade setup monitor")
+    parser.add_argument("--enable-mbo", action="store_true", help="Enable MBO data collection alongside OHLCV")
+    parser.add_argument("--enable-level1", action="store_true", help="Enable Level 1 data collection alongside OHLCV")
     args = parser.parse_args()
     
     # Check environment variables
@@ -359,6 +556,8 @@ async def main():
         sys.exit(1)
     
     live_process = None
+    level1_process = None
+    mbo_process = None
     monitor_process = None
     shutdown_event = asyncio.Event()
     
@@ -380,12 +579,65 @@ async def main():
             success = await run_backfill(days=args.days)
             sys.exit(0 if success else 1)
             
+        elif args.level1_only:
+            # Start only Level 1 streaming
+            level1_process = await run_level1_stream()
+            if not level1_process:
+                logger.error("Failed to start Level 1 streaming")
+                sys.exit(1)
+            
+            # Keep running until shutdown signal or process failure
+            while not shutdown_event.is_set():
+                await asyncio.sleep(1)
+                
+                # Check if Level 1 process is still running
+                if level1_process.poll() is not None:
+                    exit_code = level1_process.poll()
+                    logger.error(f"Level 1 stream process ended unexpectedly with exit code {exit_code}")
+                    break
+        
+        elif args.mbo_only:
+            # Start only MBO streaming
+            mbo_process = await run_mbo_stream()
+            if not mbo_process:
+                logger.error("Failed to start MBO streaming")
+                sys.exit(1)
+            
+            # Keep running until shutdown signal or process failure
+            while not shutdown_event.is_set():
+                await asyncio.sleep(1)
+                
+                # Check if MBO process is still running
+                if mbo_process.poll() is not None:
+                    exit_code = mbo_process.poll()
+                    logger.error(f"MBO stream process ended unexpectedly with exit code {exit_code}")
+                    break
+        
+        elif args.mbo_historical:
+            # Run historical MBO download
+            success = await run_mbo_historical_download(symbol=args.symbol, days=args.days)
+            sys.exit(0 if success else 1)
+            
         elif args.live_only:
             # Start live streaming
             live_process = await run_live_stream()
             if not live_process:
                 logger.error("Failed to start live streaming")
                 sys.exit(1)
+            
+            # Start Level 1 streaming if enabled
+            if args.enable_level1:
+                await asyncio.sleep(3)  # Wait for OHLCV to stabilize
+                level1_process = await run_level1_stream()
+                if not level1_process:
+                    logger.warning("Failed to start Level 1 streaming, continuing with OHLCV only")
+            
+            # Start MBO streaming if enabled
+            if args.enable_mbo:
+                await asyncio.sleep(3)  # Wait for OHLCV to stabilize
+                mbo_process = await run_mbo_stream()
+                if not mbo_process:
+                    logger.warning("Failed to start MBO streaming, continuing with OHLCV only")
                 
             # Start setup monitor if not disabled
             if not args.no_monitor:
@@ -406,6 +658,18 @@ async def main():
                     exit_code = live_process.poll()
                     logger.error(f"Live stream process ended unexpectedly with exit code {exit_code}")
                     break
+                
+                # Check if Level 1 process is still running (if it was started)
+                if level1_process and level1_process.poll() is not None:
+                    exit_code = level1_process.poll()
+                    logger.warning(f"Level 1 stream process ended with exit code {exit_code}, restarting...")
+                    level1_process = await run_level1_stream()
+                
+                # Check if MBO process is still running (if it was started)
+                if mbo_process and mbo_process.poll() is not None:
+                    exit_code = mbo_process.poll()
+                    logger.warning(f"MBO stream process ended with exit code {exit_code}, restarting...")
+                    mbo_process = await run_mbo_stream()
                 
                 # Check if monitor process is still running (if it was started)
                 if monitor_process and monitor_process.poll() is not None:
@@ -434,6 +698,20 @@ async def main():
             
             logger.info("Live streaming process started successfully")
             
+            # Start Level 1 streaming if enabled
+            if args.enable_level1:
+                await asyncio.sleep(3)  # Wait for OHLCV to stabilize
+                level1_process = await run_level1_stream()
+                if not level1_process:
+                    logger.warning("Failed to start Level 1 streaming, continuing with OHLCV only")
+            
+            # Start MBO streaming if enabled
+            if args.enable_mbo:
+                await asyncio.sleep(3)  # Wait for OHLCV to stabilize
+                mbo_process = await run_mbo_stream()
+                if not mbo_process:
+                    logger.warning("Failed to start MBO streaming, continuing with OHLCV only")
+            
             # Start setup monitor if not disabled
             if not args.no_monitor:
                 # Wait a moment for the live stream to initialize
@@ -454,6 +732,18 @@ async def main():
                     logger.error(f"Live stream process ended unexpectedly with exit code {exit_code}")
                     break
                 
+                # Check if Level 1 process is still running (if it was started)
+                if level1_process and level1_process.poll() is not None:
+                    exit_code = level1_process.poll()
+                    logger.warning(f"Level 1 stream process ended with exit code {exit_code}, restarting...")
+                    level1_process = await run_level1_stream()
+                
+                # Check if MBO process is still running (if it was started)
+                if mbo_process and mbo_process.poll() is not None:
+                    exit_code = mbo_process.poll()
+                    logger.warning(f"MBO stream process ended with exit code {exit_code}, restarting...")
+                    mbo_process = await run_mbo_stream()
+                
                 # Check if monitor process is still running (if it was started)
                 if monitor_process and monitor_process.poll() is not None:
                     exit_code = monitor_process.poll()
@@ -469,6 +759,14 @@ async def main():
         if monitor_process:
             terminate_process(monitor_process)
             logger.info("Setup monitor process terminated")
+            
+        if level1_process:
+            terminate_process(level1_process)
+            logger.info("Level 1 stream process terminated")
+            
+        if mbo_process:
+            terminate_process(mbo_process)
+            logger.info("MBO stream process terminated")
             
         if live_process:
             terminate_process(live_process)

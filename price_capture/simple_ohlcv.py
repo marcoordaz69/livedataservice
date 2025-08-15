@@ -657,7 +657,7 @@ async def main():
         logger.info("Setup monitor initialized")
         
         # Get enabled symbols for initial setup loading
-        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ').split(',')
+        enabled_symbols = os.getenv('ENABLED_SYMBOLS', 'NQ,ES').split(',')
         enabled_symbols = [s.strip() for s in enabled_symbols]
         
         # Load setups for all enabled symbols
