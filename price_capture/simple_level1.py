@@ -48,6 +48,7 @@ load_dotenv()
 db_pool = None
 main_loop = None
 latest_level1_cache = {}
+last_update_time = datetime.now()
 
 def format_price(price):
     """Format the raw price value from nanoseconds to dollars."""
@@ -130,6 +131,8 @@ async def release_db_connection(conn):
 
 async def insert_level1_data(tbbo_record):
     """Insert Level 1 TBBO record into database."""
+    global last_update_time
+    
     if not tbbo_record:
         return
     
@@ -179,6 +182,9 @@ async def insert_level1_data(tbbo_record):
                 'mid_price': (tbbo_record['bid_price'] + tbbo_record['ask_price']) / 2,
                 'spread': tbbo_record['ask_price'] - tbbo_record['bid_price']
             }
+            
+            # Update last successful update time
+            last_update_time = datetime.now()
             
             logger.debug(f"Level 1 update: {symbol} ${tbbo_record['bid_price']:.2f}x{tbbo_record['bid_size']} / ${tbbo_record['ask_price']:.2f}x{tbbo_record['ask_size']}")
             
@@ -368,7 +374,7 @@ async def main():
         
         # Keep the script running and monitor connection
         count = 0
-        last_update = datetime.now()
+        global last_update_time
         try:
             while True:
                 await asyncio.sleep(10)
@@ -376,7 +382,7 @@ async def main():
                 if count % 6 == 0:  # Every 60 seconds
                     current_time = datetime.now()
                     logger.info(f"Level 1 stream active - monitoring {len(databento_symbols)} symbols")
-                    logger.info(f"Last update: {(current_time - last_update).seconds}s ago")
+                    logger.info(f"Last update: {(current_time - last_update_time).seconds}s ago")
                     
                     # Log current market data
                     for symbol in enabled_symbols:
@@ -384,9 +390,9 @@ async def main():
                             data = latest_level1_cache[symbol]
                             logger.info(f"  {symbol}: ${data['bid_price']:.2f}x{data['bid_size']} / ${data['ask_price']:.2f}x{data['ask_size']} (mid: ${data['mid_price']:.2f}, spread: ${data['spread']:.2f})")
                     
-                    # If no updates for a long time, try to reconnect
-                    if (current_time - last_update).seconds > 300:  # 5 minutes
-                        logger.warning("No Level 1 updates for 5 minutes, attempting to reconnect...")
+                    # If no updates for a long time, try to reconnect (reduced from 5 minutes to 2 minutes)
+                    if (current_time - last_update_time).seconds > 120:  # 2 minutes
+                        logger.warning("No Level 1 updates for 2 minutes, attempting to reconnect...")
                         
                         try:
                             client.stop()
@@ -407,7 +413,7 @@ async def main():
                             )
                             
                             client.start()
-                            last_update = datetime.now()
+                            last_update_time = datetime.now()
                             logger.info("Level 1 reconnected successfully")
                         except Exception as reconnect_error:
                             logger.error(f"Failed to reconnect Level 1: {reconnect_error}")

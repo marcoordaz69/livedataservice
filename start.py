@@ -49,8 +49,8 @@ def check_environment():
     logger.info("✅ All required environment variables are set")
     return True
 
-async def run_with_health_check(main_func):
-    """Run main coroutine alongside health check server"""
+async def run_with_health_check(use_monitor=False):
+    """Run services alongside health check server"""
     from health_check import run_health_server
     
     # Start health check server as background task FIRST
@@ -61,12 +61,20 @@ async def run_with_health_check(main_func):
     logger.info("Health check server should be running...")
     
     try:
-        # Run main launcher
-        await main_func()
+        if use_monitor:
+            # Use the new service monitor for better reliability
+            logger.info("Starting service monitor for improved reliability...")
+            from price_capture.service_monitor import ServiceMonitor
+            monitor = ServiceMonitor()
+            await monitor.start()
+        else:
+            # Use the original launcher
+            from price_capture.live_data_launcher import main
+            await main()
     except Exception as e:
-        logger.error(f"Main launcher failed: {e}")
+        logger.error(f"Service failed: {e}")
         # Keep health server running even if main fails
-        logger.info("Keeping health server running despite main launcher failure...")
+        logger.info("Keeping health server running despite service failure...")
         try:
             while True:
                 await asyncio.sleep(60)
@@ -101,18 +109,20 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     
     try:
-        logger.info("Starting live data launcher...")
+        logger.info("Starting live data service...")
         
-        # Import and run the main launcher
-        from price_capture.live_data_launcher import main
+        # For Railway, use the service monitor for better reliability
+        use_monitor = os.getenv('RAILWAY_DEPLOYMENT') or os.getenv('USE_SERVICE_MONITOR')
         
-        # For Railway, check if we should run in live-only mode with Level 1
-        if os.getenv('RAILWAY_DEPLOYMENT'):
-            logger.info("🚂 Railway deployment detected - running in live-only mode with Level 1 data")
+        if use_monitor:
+            logger.info("🚂 Railway/Monitor mode - using service monitor for improved reliability")
+            asyncio.run(run_with_health_check(use_monitor=True))
+        else:
+            # Use original launcher for local development
+            logger.info("Local mode - using standard launcher")
             # Modify sys.argv to add --live-only and --enable-level1 flags
             sys.argv.extend(['--live-only', '--enable-level1'])
-        
-        asyncio.run(run_with_health_check(main))
+            asyncio.run(run_with_health_check(use_monitor=False))
     except KeyboardInterrupt:
         logger.info("Launcher terminated by user")
     except Exception as e:
