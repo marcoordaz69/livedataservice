@@ -14,18 +14,18 @@ import time
 from setup_monitor import SetupMonitor
 from database.db_factory import get_db
 
-# Symbol configuration - using continuous contracts like Level 1
+# Symbol configuration - using continuous contracts to match live_data_service.py
 SYMBOL_CONFIG = {
     'NQ': {
-        'databento_symbol': 'NQ.c.0',  # Continuous contract
+        'databento_symbol': 'NQ.c.0',  # Continuous contract (front month)
         'db_symbol': 'NQ',
-        'price_range': {'min': 15000, 'max': 25000},  # Current NQ levels
+        'price_range': {'min': 10000, 'max': 50000},  # Match working live_data_service.py
         'description': 'NASDAQ 100 E-mini (Continuous)'
     },
     'ES': {
-        'databento_symbol': 'ES.c.0',  # Continuous contract  
+        'databento_symbol': 'ES.c.0',  # Continuous contract (front month)
         'db_symbol': 'ES',
-        'price_range': {'min': 5000, 'max': 8000},   # Current ES levels
+        'price_range': {'min': 2000, 'max': 10000},   # Match working live_data_service.py
         'description': 'S&P 500 E-mini (Continuous)'
     }
 }
@@ -273,13 +273,13 @@ def process_record(record):
             elif instrument_id == 42008487:  # NQ instrument from logs  
                 normalized_symbol = 'NQ'
         
-        # Validate the price for the determined symbol (with updated ranges)
+        # Validate the price for the determined symbol (use working ranges from live_data_service.py)
         avg_price = sum([open_price, high_price, low_price, close_price]) / 4
-        if normalized_symbol == 'ES' and not (5000 <= avg_price <= 8000):
-            logger.warning(f"ES price {avg_price:.2f} outside expected range 5000-8000 at {timestamp.isoformat()}")
-        elif normalized_symbol == 'NQ' and not (15000 <= avg_price <= 25000):
-            # Current NQ is around 20,000+, not 6,496 (that's likely ES)
-            if 5000 <= avg_price <= 8000:
+        if normalized_symbol == 'ES' and not (2000 <= avg_price <= 10000):
+            logger.warning(f"ES price {avg_price:.2f} outside expected range 2000-10000 at {timestamp.isoformat()}")
+        elif normalized_symbol == 'NQ' and not (10000 <= avg_price <= 50000):
+            # If it's outside NQ range but in ES range, correct it
+            if 2000 <= avg_price <= 10000:
                 logger.info(f"Price {avg_price:.2f} looks like ES, correcting symbol from NQ to ES")
                 normalized_symbol = 'ES'
         
